@@ -16,12 +16,15 @@ const nameVertexShader = /* glsl */ `
     vec2 normalizedText = vec2(p.x / 6.4, p.y / 1.45);
     vec2 delta = normalizedText - uPointer;
     float pointerDistance = length(delta);
-    float influence = exp(-pointerDistance * 5.8);
+    float influence = 1.0 - smoothstep(0.04, 0.62, pointerDistance);
+    float broadInfluence = 1.0 - smoothstep(0.0, 1.12, pointerDistance);
     vec2 direction = normalize(delta + vec2(0.0001));
+    vec2 tangent = vec2(-direction.y, direction.x);
 
-    p.xy += direction * influence * (0.1 + aSeed * 0.065);
-    p.z += influence * (0.32 + aSeed * 0.16);
-    p.z += sin(uTime * 0.65 + aSeed * 28.0) * 0.015;
+    p.xy += direction * influence * (0.72 + aSeed * 0.3);
+    p.xy += tangent * sin(aSeed * 31.0 + uTime * 0.22) * influence * 0.11;
+    p.z += influence * (0.56 + aSeed * 0.24);
+    p.z += sin(uTime * 0.48 + aSeed * 28.0) * (0.012 + broadInfluence * 0.045);
 
     float ring = exp(-abs(pointerDistance - uPulse * 0.7) * 11.0) * uPulse;
     p.xy += direction * ring * 0.33;
@@ -29,7 +32,7 @@ const nameVertexShader = /* glsl */ `
 
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
-    gl_PointSize = (0.86 + aSeed * 0.9 + influence * 1.9 + ring * 1.8) * (21.0 / -viewPosition.z);
+    gl_PointSize = (1.05 + aSeed * 0.82 + influence * 1.28 + ring * 1.62) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring;
@@ -105,13 +108,13 @@ function createNameGeometry(label: string) {
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
   const positions: number[] = [];
   const seeds: number[] = [];
-  const step = 3;
+  const step = 5;
 
   for (let y = 0; y < canvas.height; y += step) {
     for (let x = 0; x < canvas.width; x += step) {
       const alpha = pixels[(y * canvas.width + x) * 4 + 3];
-      if (alpha > 96 && Math.random() > 0.05) {
-        const jitter = step * 0.12;
+      if (alpha > 96 && Math.random() > 0.07) {
+        const jitter = step * 0.18;
         positions.push(
           ((x - canvas.width / 2 + (Math.random() - 0.5) * jitter) / canvas.width) * 12.7,
           (-(y - canvas.height / 2 + (Math.random() - 0.5) * jitter) / canvas.height) * 2.95,
@@ -139,12 +142,12 @@ export default function Home() {
     if (!mount) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x121617);
-    scene.fog = new THREE.FogExp2(0x171b1b, 0.033);
+    scene.background = new THREE.Color(0x56605d);
+    scene.fog = new THREE.Fog(0x65706c, 17, 58);
 
     const compact = window.innerWidth < 760;
-    const camera = new THREE.PerspectiveCamera(compact ? 54 : 44, 1, 0.1, 70);
-    camera.position.set(0, 0.55, compact ? 18.2 : 15.3);
+    const camera = new THREE.PerspectiveCamera(compact ? 55 : 44, 1, 0.1, 90);
+    camera.position.set(0, 1.8, compact ? 20.4 : 17.2);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -153,7 +156,7 @@ export default function Home() {
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.68;
+    renderer.toneMappingExposure = 0.92;
     renderer.shadowMap.enabled = !compact;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
@@ -161,43 +164,86 @@ export default function Home() {
 
     const concreteTexture = createConcreteTexture();
     const concrete = new THREE.MeshStandardMaterial({
-      color: 0x4a5050,
+      color: 0x747b77,
       roughness: 0.96,
-      metalness: 0.02,
+      metalness: 0.04,
       map: concreteTexture ?? undefined,
       bumpMap: concreteTexture ?? undefined,
-      bumpScale: 0.065,
+      bumpScale: 0.085,
     });
     const darkConcrete = concrete.clone();
-    darkConcrete.color.setHex(0x272c2c);
+    darkConcrete.color.setHex(0x3b4240);
     darkConcrete.roughness = 1;
-    const floorMaterial = concrete.clone();
-    floorMaterial.color.setHex(0x303636);
-    floorMaterial.roughness = 0.8;
-    const blackMaterial = new THREE.MeshStandardMaterial({
-      color: 0x101313,
-      roughness: 0.88,
-      metalness: 0.16,
+    const metalMaterial = new THREE.MeshStandardMaterial({
+      color: 0x39413f,
+      roughness: 0.42,
+      metalness: 0.72,
+      envMapIntensity: 0.7,
     });
-    const redMaterial = new THREE.MeshStandardMaterial({
-      color: 0x3a0503,
-      emissive: 0xff160d,
-      emissiveIntensity: 1.8,
-      roughness: 0.5,
+    const terrainMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3f4945,
+      roughness: 1,
+      metalness: 0,
+      map: concreteTexture ?? undefined,
+      bumpMap: concreteTexture ?? undefined,
+      bumpScale: 0.13,
     });
-    const portalMaterial = new THREE.MeshBasicMaterial({ color: 0x8c0b07 });
-    const redHazeMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff1b11,
+    const redSeamMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff281e,
       transparent: true,
-      opacity: 0.09,
+      opacity: 0.78,
+      blending: THREE.AdditiveBlending,
+    });
+    const haloMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff2b20,
+      transparent: true,
+      opacity: 0.94,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      side: THREE.DoubleSide,
     });
+    const haloGlowMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff130b,
+      transparent: true,
+      opacity: 0.12,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const eclipseMaterial = new THREE.MeshBasicMaterial({ color: 0x080b0b });
+
+    const skyMaterial = new THREE.ShaderMaterial({
+      depthWrite: false,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        void main() {
+          vec3 horizon = vec3(0.38, 0.43, 0.41);
+          vec3 zenith = vec3(0.055, 0.075, 0.076);
+          float gradient = smoothstep(0.04, 0.92, vUv.y);
+          float cloudA = sin(vUv.x * 13.0 + uTime * 0.018) * sin(vUv.y * 8.0 - uTime * 0.012);
+          float cloudB = sin(vUv.x * 31.0 - vUv.y * 12.0 + uTime * 0.01);
+          float clouds = (cloudA * 0.55 + cloudB * 0.45) * (1.0 - gradient) * 0.035;
+          vec3 color = mix(horizon, zenith, pow(gradient, 0.7)) + clouds;
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+    });
+    const sky = new THREE.Mesh(new THREE.PlaneGeometry(110, 58), skyMaterial);
+    sky.position.set(0, 8.5, -42);
+    scene.add(sky);
 
     const architecture = new THREE.Group();
+    const landscape = new THREE.Group();
     scene.add(architecture);
-    const floatingBlocks: THREE.Mesh[] = [];
+    scene.add(landscape);
 
     const addBlock = (
       x: number,
@@ -218,81 +264,145 @@ export default function Home() {
       return mesh;
     };
 
-    // A deep, inhabited brutalist hall rather than a flat backdrop.
-    addBlock(0, 2.2, -13, 31, 17, 1.2, darkConcrete);
-    addBlock(0, -3.65, -1, 30, 0.9, 28, floorMaterial);
-    addBlock(-10.1, 1.3, -4.5, 3.4, 12, 12, darkConcrete, -0.08);
-    addBlock(10.1, 1.3, -4.5, 3.4, 12, 12, darkConcrete, 0.08);
+    // A broken, windswept terrain creates the open-world scale around the structure.
+    const terrainGeometry = new THREE.PlaneGeometry(90, 78, 100, 100);
+    const terrainPositions = terrainGeometry.attributes.position as THREE.BufferAttribute;
+    for (let index = 0; index < terrainPositions.count; index += 1) {
+      const x = terrainPositions.getX(index);
+      const depth = terrainPositions.getY(index);
+      const distanceFromRoad = Math.abs(x);
+      const broadHill = Math.sin(x * 0.23) * 0.5 + Math.cos(depth * 0.19) * 0.36;
+      const roughness = Math.sin((x + depth) * 0.72) * 0.13 + Math.cos((x - depth) * 0.51) * 0.1;
+      const roadFlattening = THREE.MathUtils.smoothstep(distanceFromRoad, 2.2, 8.5);
+      terrainPositions.setZ(index, (broadHill + roughness) * (0.22 + roadFlattening * 0.78));
+    }
+    terrainGeometry.computeVertexNormals();
+    const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+    terrain.rotation.x = -Math.PI / 2;
+    terrain.position.set(0, -3.32, -13);
+    terrain.receiveShadow = !compact;
+    landscape.add(terrain);
 
-    // Monumental gateway framing the red anomaly.
-    addBlock(-3.95, 0.9, -8.1, 1.35, 9.6, 1.5, concrete);
-    addBlock(3.95, 0.9, -8.1, 1.35, 9.6, 1.5, concrete);
-    addBlock(0, 5.35, -8.1, 9.25, 1.25, 1.5, concrete);
-    addBlock(0, -3.25, -8.1, 9.25, 0.75, 2.4, blackMaterial);
-    addBlock(0, 0.9, -8.72, 6.5, 7.7, 0.12, portalMaterial);
+    const approach = new THREE.Mesh(new THREE.PlaneGeometry(5.2, 46), metalMaterial);
+    approach.rotation.x = -Math.PI / 2;
+    approach.position.set(0, -3.19, 2.5);
+    approach.receiveShadow = !compact;
+    landscape.add(approach);
 
-    // Suspended administrative volumes and a severe concrete balcony.
-    addBlock(0, 2.45, -4.8, 12.8, 0.58, 4.5, concrete);
-    addBlock(-5.7, 4.65, -5.2, 5.8, 2.45, 3.2, darkConcrete);
-    addBlock(5.85, 4.15, -5.9, 5.2, 3.25, 3.4, darkConcrete);
-    addBlock(-7.05, -0.45, -3.15, 2.2, 5.4, 3.4, concrete);
-    addBlock(7.2, -0.7, -2.45, 2.55, 5.1, 3.8, concrete);
-
-    // Repeated beams establish scale and perspective.
-    for (let i = 0; i < 6; i += 1) {
-      const z = 3.5 - i * 3.2;
-      addBlock(-8.5, 5.65, z, 0.72, 1.05, 5.7, concrete, -0.02);
-      addBlock(8.5, 5.65, z, 0.72, 1.05, 5.7, concrete, 0.02);
-      addBlock(0, 6.2, z, 18, 0.62, 0.9, darkConcrete);
+    // Distant rocks and remnants make the structure feel abandoned rather than staged.
+    const rockGeometry = new THREE.DodecahedronGeometry(1, 0);
+    for (let index = 0; index < 42; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const distance = 5.5 + Math.random() * 22;
+      const rock = new THREE.Mesh(rockGeometry, terrainMaterial);
+      rock.position.set(side * distance, -2.95 + Math.random() * 0.25, -2 - Math.random() * 38);
+      rock.scale.set(0.35 + Math.random() * 1.7, 0.3 + Math.random() * 1.1, 0.45 + Math.random() * 2.2);
+      rock.rotation.set(Math.random() * 1.4, Math.random() * Math.PI, Math.random() * 0.5);
+      rock.castShadow = !compact;
+      rock.receiveShadow = !compact;
+      landscape.add(rock);
     }
 
-    // A few impossible floating blocks break the architectural logic.
-    const floatingData = [
-      [-2.6, 4.8, -2.5, 1.2, 1.1, 1.5],
-      [2.1, 5.6, -4.0, 1.65, 0.8, 1.1],
-      [5.2, 2.4, -5.0, 0.85, 1.7, 0.9],
-      [-4.9, 1.8, -6.0, 1.1, 0.75, 1.2],
-      [0.2, 4.4, -6.7, 0.75, 1.3, 0.8],
-    ];
-    floatingData.forEach(([x, y, z, width, height, depth], index) => {
-      const block = addBlock(x, y, z, width, height, depth, index === 1 ? redMaterial : concrete);
-      block.rotation.set(index * 0.17, index * 0.28, index * -0.09);
-      floatingBlocks.push(block);
+    for (let index = 0; index < 8; index += 1) {
+      const side = index % 2 === 0 ? -1 : 1;
+      const ruin = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2 + Math.random() * 1.8, 4 + Math.random() * 7, 1.4 + Math.random() * 2.4),
+        darkConcrete,
+      );
+      ruin.position.set(side * (10 + Math.random() * 15), -0.8, -17 - Math.random() * 25);
+      ruin.rotation.z = (Math.random() - 0.5) * 0.08;
+      ruin.castShadow = !compact;
+      landscape.add(ruin);
+    }
+
+    // The central object follows the supplied reference: a colossal inverted pyramid.
+    const pyramidMaterial = concrete.clone();
+    pyramidMaterial.color.setHex(0x52636a);
+    pyramidMaterial.roughness = 0.62;
+    pyramidMaterial.metalness = 0.3;
+    pyramidMaterial.bumpScale = 0.12;
+    const pyramidGeometry = new THREE.ConeGeometry(9.4, 13.2, 4, 1, false, Math.PI / 4);
+    const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
+    pyramid.position.set(0, 6.05, -6.15);
+    pyramid.rotation.z = Math.PI;
+    pyramid.castShadow = !compact;
+    pyramid.receiveShadow = !compact;
+    architecture.add(pyramid);
+
+    const edgeMaterial = new THREE.LineBasicMaterial({
+      color: 0x9faaa6,
+      transparent: true,
+      opacity: 0.16,
     });
+    const pyramidEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pyramidGeometry, 20), edgeMaterial);
+    pyramidEdges.position.copy(pyramid.position);
+    pyramidEdges.rotation.copy(pyramid.rotation);
+    architecture.add(pyramidEdges);
 
-    // Thin emissive ceiling panels create the hard, institutional top light.
-    const lightPanelMaterial = new THREE.MeshBasicMaterial({ color: 0xb9c7c5 });
-    for (const x of [-5.7, -1.9, 1.9, 5.7]) {
-      const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.2), lightPanelMaterial);
-      panel.position.set(x, 5.82, 1.4);
-      panel.rotation.x = Math.PI / 2;
-      architecture.add(panel);
-    }
+    // A low receiving plinth and a small red marker make the levitation scale readable.
+    addBlock(0, -2.96, -5.8, 9.4, 0.48, 6.6, darkConcrete);
+    addBlock(0, -1.58, -5.05, 0.08, 2.25, 0.08, redSeamMaterial);
 
-    const redHaze = new THREE.Mesh(new THREE.BoxGeometry(6.1, 7.1, 5.2), redHazeMaterial);
-    redHaze.position.set(0, 0.8, -6.2);
-    architecture.add(redHaze);
+    // Eclipse halo stays behind the mass; only the red rim should escape its silhouette.
+    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(6.15, 160), eclipseMaterial);
+    eclipseDisc.position.set(0, 7.6, -7.25);
+    architecture.add(eclipseDisc);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(6.28, 0.04, 8, 192), haloMaterial);
+    halo.position.set(0, 7.6, -7.12);
+    architecture.add(halo);
+    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(6.28, 0.2, 12, 192), haloGlowMaterial);
+    haloGlow.position.set(0, 7.6, -7.18);
+    architecture.add(haloGlow);
 
-    const ambientLight = new THREE.HemisphereLight(0xb8cac8, 0x070909, 1.3);
+    const redAtmosphereMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff1b12,
+      transparent: true,
+      opacity: 0.035,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
+    const redAtmosphere = new THREE.Mesh(
+      new THREE.ConeGeometry(4.8, 4.8, 48, 1, true),
+      redAtmosphereMaterial,
+    );
+    redAtmosphere.position.set(0, -1.05, -5.45);
+    architecture.add(redAtmosphere);
+
+    const ambientLight = new THREE.HemisphereLight(0xb7c4bf, 0x151a17, 1.8);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.SpotLight(0xdde8e5, 900, 38, Math.PI * 0.28, 0.78, 1.45);
-    keyLight.position.set(-5, 9.5, 7.5);
-    keyLight.target.position.set(0, -1, -5);
+    const keyLight = new THREE.DirectionalLight(0xd5ded9, 3.35);
+    keyLight.position.set(-8, 13, 8);
     keyLight.castShadow = !compact;
-    keyLight.shadow.mapSize.set(1024, 1024);
-    scene.add(keyLight, keyLight.target);
+    keyLight.shadow.mapSize.set(1536, 1536);
+    keyLight.shadow.camera.left = -16;
+    keyLight.shadow.camera.right = 16;
+    keyLight.shadow.camera.top = 17;
+    keyLight.shadow.camera.bottom = -10;
+    scene.add(keyLight);
 
-    const redLight = new THREE.SpotLight(0xff2116, 680, 34, Math.PI * 0.32, 0.76, 1.2);
-    redLight.position.set(0, 4.7, -6.4);
-    redLight.target.position.set(0, -1.2, 1.5);
-    redLight.castShadow = !compact;
-    redLight.shadow.mapSize.set(1024, 1024);
-    scene.add(redLight, redLight.target);
+    const coldFill = new THREE.DirectionalLight(0x718985, 1.35);
+    coldFill.position.set(9, 3, -2);
+    scene.add(coldFill);
 
-    const sideLight = new THREE.DirectionalLight(0x9aafad, 1.5);
-    sideLight.position.set(7, 4, 8);
-    scene.add(sideLight);
+    const frontFill = new THREE.DirectionalLight(0xc1cfca, 1.25);
+    frontFill.position.set(2, 5, 12);
+    scene.add(frontFill);
+
+    const redLight = new THREE.PointLight(0xff2418, 92, 19, 2);
+    redLight.position.set(0, -0.55, -4.25);
+    scene.add(redLight);
+
+    const redUplight = new THREE.SpotLight(0xff2518, 360, 30, Math.PI * 0.17, 0.95, 1.55);
+    redUplight.position.set(0, -2.85, -2.2);
+    redUplight.target.position.set(0, 3.8, -6.15);
+    scene.add(redUplight, redUplight.target);
+
+    const coldSurfaceLight = new THREE.SpotLight(0xc8dedf, 520, 45, Math.PI * 0.3, 0.82, 1.4);
+    coldSurfaceLight.position.set(-9, 9.5, 10);
+    coldSurfaceLight.target.position.set(0, 4.5, -6.1);
+    scene.add(coldSurfaceLight, coldSurfaceLight.target);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
     const nameGeometry = createNameGeometry("Siwei Yuan");
@@ -309,7 +419,7 @@ export default function Home() {
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
-    namePoints.position.set(0, 0.1, 2.25);
+    namePoints.position.set(0, -1.18, 2.65);
     namePoints.scale.setScalar(compact ? 0.72 : 1);
     namePoints.renderOrder = 12;
     scene.add(namePoints);
@@ -349,15 +459,17 @@ export default function Home() {
       const elapsed = reduceMotion ? 0 : (timestamp - startTime) / 1000;
       currentPointer.lerp(targetPointer, reduceMotion ? 1 : 0.045);
 
-      const baseZ = compact ? 18.2 : 15.3;
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, currentPointer.x * 0.82, 0.045);
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 0.55 + currentPointer.y * 0.48, 0.045);
+      const baseZ = compact ? 20.4 : 17.2;
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, currentPointer.x * 1.05, 0.045);
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.8 + currentPointer.y * 0.58, 0.045);
       camera.position.z = THREE.MathUtils.lerp(camera.position.z, baseZ + scrollRef.current * 2.4, 0.03);
-      camera.lookAt(currentPointer.x * -0.22, currentPointer.y * -0.12, -2.8);
+      camera.lookAt(currentPointer.x * -0.3, 1.15 + currentPointer.y * -0.18, -5.8);
 
-      architecture.rotation.y = THREE.MathUtils.lerp(architecture.rotation.y, currentPointer.x * -0.032, 0.04);
-      architecture.rotation.x = THREE.MathUtils.lerp(architecture.rotation.x, currentPointer.y * 0.014, 0.04);
-      architecture.position.x = THREE.MathUtils.lerp(architecture.position.x, currentPointer.x * -0.22, 0.04);
+      architecture.rotation.y = THREE.MathUtils.lerp(architecture.rotation.y, currentPointer.x * -0.042, 0.04);
+      architecture.rotation.x = THREE.MathUtils.lerp(architecture.rotation.x, currentPointer.y * 0.012, 0.04);
+      architecture.position.x = THREE.MathUtils.lerp(architecture.position.x, currentPointer.x * -0.28, 0.04);
+      landscape.position.x = THREE.MathUtils.lerp(landscape.position.x, currentPointer.x * -0.09, 0.025);
+      landscape.rotation.y = THREE.MathUtils.lerp(landscape.rotation.y, currentPointer.x * -0.008, 0.025);
 
       namePoints.rotation.y = THREE.MathUtils.lerp(namePoints.rotation.y, currentPointer.x * 0.035, 0.06);
       namePoints.rotation.x = THREE.MathUtils.lerp(namePoints.rotation.x, currentPointer.y * -0.018, 0.06);
@@ -366,11 +478,11 @@ export default function Home() {
       pulseRef.current *= reduceMotion ? 0.7 : 0.935;
       nameMaterial.uniforms.uPulse.value = pulseRef.current;
 
-      floatingBlocks.forEach((block, index) => {
-        block.position.y += Math.sin(elapsed * 0.34 + index * 1.7) * 0.0009;
-        block.rotation.y += reduceMotion ? 0 : 0.00025 * (index % 2 ? 1 : -1);
-      });
-      redHaze.material.opacity = 0.075 + Math.sin(elapsed * 0.52) * 0.018;
+      haloGlow.material.opacity = 0.095 + Math.sin(elapsed * 0.42) * 0.025;
+      redLight.intensity = 86 + Math.sin(elapsed * 0.38) * 10;
+      redUplight.intensity = 340 + Math.sin(elapsed * 0.31) * 36;
+      redAtmosphereMaterial.opacity = 0.028 + Math.sin(elapsed * 0.36) * 0.009;
+      skyMaterial.uniforms.uTime.value = elapsed;
 
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
@@ -388,14 +500,23 @@ export default function Home() {
       architecture.traverse((object) => {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
+      landscape.traverse((object) => {
+        if (object instanceof THREE.Mesh) object.geometry.dispose();
+      });
+      sky.geometry.dispose();
       concrete.dispose();
       darkConcrete.dispose();
-      floorMaterial.dispose();
-      blackMaterial.dispose();
-      redMaterial.dispose();
-      portalMaterial.dispose();
-      redHazeMaterial.dispose();
-      lightPanelMaterial.dispose();
+      metalMaterial.dispose();
+      terrainMaterial.dispose();
+      redSeamMaterial.dispose();
+      haloMaterial.dispose();
+      haloGlowMaterial.dispose();
+      eclipseMaterial.dispose();
+      pyramidMaterial.dispose();
+      pyramidEdges.geometry.dispose();
+      edgeMaterial.dispose();
+      redAtmosphereMaterial.dispose();
+      skyMaterial.dispose();
       concreteTexture?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
