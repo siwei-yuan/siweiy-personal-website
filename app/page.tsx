@@ -149,7 +149,6 @@ const nameFragmentShader = /* glsl */ `
 const dossierSections = [
   {
     id: "experience",
-    index: "01",
     label: "Experience",
     eyebrow: "Personnel record / selected chapters",
     entries: [
@@ -160,7 +159,6 @@ const dossierSections = [
   },
   {
     id: "projects",
-    index: "02",
     label: "Projects",
     eyebrow: "Casework / selected operations",
     entries: [
@@ -171,7 +169,6 @@ const dossierSections = [
   },
   {
     id: "blogs",
-    index: "03",
     label: "Blogs",
     eyebrow: "Field notes / public transmissions",
     entries: [
@@ -699,12 +696,15 @@ export default function Home() {
     const updateScrollStory = () => {
       targetScroll = window.scrollY;
       const viewportHeight = Math.max(window.innerHeight, 1);
+      document.documentElement.classList.toggle("has-left-hero", targetScroll > viewportHeight * 0.12);
       document.querySelectorAll<HTMLElement>(".dossier-section").forEach((section) => {
         const rect = section.getBoundingClientRect();
         const travel = Math.max(section.offsetHeight - viewportHeight, 1);
         const progress = THREE.MathUtils.clamp(-rect.top / travel, 0, 1);
-        const titleVisible = rect.top <= 0 && progress < 0.34;
-        const recordProgress = THREE.MathUtils.clamp((progress - 0.42) / 0.34, 0, 1);
+        const titleVisible = rect.top <= 0 && rect.bottom > 0;
+        const titleExit = THREE.MathUtils.clamp((progress - 0.34) / 0.38, 0, 1);
+        const recordProgress = THREE.MathUtils.clamp((progress - 0.38) / 0.34, 0, 1);
+        section.style.setProperty("--title-exit", titleExit.toFixed(4));
         section.style.setProperty("--records-progress", recordProgress.toFixed(4));
         section.classList.toggle(
           "is-title-visible",
@@ -792,6 +792,7 @@ export default function Home() {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("scroll", updateScrollStory);
+      document.documentElement.classList.remove("has-left-hero");
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("resize", resize);
       nameGeometry.dispose();
@@ -826,6 +827,7 @@ export default function Home() {
       <main className="scroll-story">
         <section className="hero-spacer" aria-labelledby="site-title">
           <h1 id="site-title" className="sr-only">Siwei Yuan</h1>
+          <a className="scroll-cue" href="#experience" aria-label="Scroll to experience" />
         </section>
 
         {dossierSections.map((section) => (
@@ -838,7 +840,6 @@ export default function Home() {
             <div className="dossier-sticky">
               <header className="section-title-position">
                 <div className="section-title-hit">
-                  <span>{section.index}</span>
                   <h2>{section.label}</h2>
                 </div>
               </header>
@@ -846,9 +847,8 @@ export default function Home() {
               <div className="dossier-records">
                 <p className="records-eyebrow">{section.eyebrow}</p>
                 <div className="records-list">
-                  {section.entries.map((entry, index) => (
+                  {section.entries.map((entry) => (
                     <article key={entry.title}>
-                      <b>0{index + 1}</b>
                       <span>{entry.marker}</span>
                       <h3>{entry.title}</h3>
                       <p>{entry.detail}</p>
