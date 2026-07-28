@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
 const nameVertexShader = /* glsl */ `
@@ -11,6 +11,7 @@ const nameVertexShader = /* glsl */ `
   uniform float uTime;
   uniform vec2 uPointer;
   uniform float uPulse;
+  uniform float uExit;
   varying float vSeed;
   varying float vEnergy;
   varying float vLens;
@@ -19,6 +20,14 @@ const nameVertexShader = /* glsl */ `
 
   void main() {
     vec3 p = position;
+
+    vec3 exitDirection = normalize(vec3(
+      sin(aSeed * 81.7 + 0.4),
+      cos(aSeed * 67.3 - 0.8),
+      sin(aSeed * 43.9 + 1.7)
+    ));
+    p += exitDirection * uExit * (1.4 + aSeed * 8.2);
+    p.y += (aSeed - 0.5) * uExit * uExit * 4.2;
 
     // Wrap the word around a very flat, horizontal ellipsoid. The centre bulges
     // toward the viewer while both ends curl back and taper into the equator.
@@ -112,6 +121,8 @@ const nameVertexShader = /* glsl */ `
 
 const nameFragmentShader = /* glsl */ `
   precision highp float;
+  uniform float uFade;
+  uniform float uExit;
   varying float vSeed;
   varying float vEnergy;
   varying float vLens;
@@ -129,12 +140,47 @@ const nameFragmentShader = /* glsl */ `
     color += vec3(1.28, 1.34, 1.3) * vGlow;
     float alpha = circle * (0.7 + vEnergy * 0.16 + vDisperse * 0.12);
     alpha += softGlow * vGlow * 0.62;
+    alpha *= uFade * (1.0 - uExit);
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
-const navItems = ["experience", "projects", "blogs", "contact"] as const;
+const dossierSections = [
+  {
+    id: "experience",
+    index: "01",
+    label: "Experience",
+    eyebrow: "Personnel record / selected chapters",
+    entries: [
+      { marker: "2024—NOW", title: "Current Role", detail: "Company · title · territory under control." },
+      { marker: "2021—2024", title: "Previous Chapter", detail: "Intervention · consequence · recorded outcome." },
+      { marker: "2018—2021", title: "Origin Point", detail: "Formative work · systems · useful scars." },
+    ],
+  },
+  {
+    id: "projects",
+    index: "02",
+    label: "Projects",
+    eyebrow: "Casework / selected operations",
+    entries: [
+      { marker: "CASE / A", title: "Untitled Artifact A", detail: "Context · intervention · measurable consequence." },
+      { marker: "CASE / B", title: "Untitled Artifact B", detail: "System · failure mode · recovered signal." },
+      { marker: "CASE / C", title: "Untitled Artifact C", detail: "Prototype · deployment · observed effect." },
+    ],
+  },
+  {
+    id: "blogs",
+    index: "03",
+    label: "Blogs",
+    eyebrow: "Field notes / public transmissions",
+    entries: [
+      { marker: "NOTE / 01", title: "First Transmission", detail: "Systems · design · technology · unfamiliar territory." },
+      { marker: "NOTE / 02", title: "Field Note", detail: "A record of something that should not have worked." },
+      { marker: "NOTE / 03", title: "Observation", detail: "Methods for looking directly at strange systems." },
+    ],
+  },
+] as const;
 
 function createNameGeometry(label: string) {
   const canvas = document.createElement("canvas");
@@ -205,9 +251,7 @@ function createNameGeometry(label: string) {
 export default function Home() {
   const sceneMountRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef(0);
   const pulseRef = useRef(0);
-  const [activeSection, setActiveSection] = useState("experience");
 
   useEffect(() => {
     const mount = sceneMountRef.current;
@@ -241,7 +285,7 @@ export default function Home() {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       depthTest: true,
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uFade: { value: 1 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() {
@@ -253,6 +297,7 @@ export default function Home() {
         precision highp float;
         varying vec2 vUv;
         uniform float uTime;
+        uniform float uFade;
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float radius = length(p);
@@ -292,7 +337,7 @@ export default function Home() {
             + scatterGlow * (shoulder * 0.014 + whiteHot * 0.055)
             + ovalCore * 0.68 + ovalBloom * 0.16;
           float outerFeather = 1.0 - smoothstep(0.93, 0.995, radius);
-          float alpha = (baseLight + bloom) * pulse * outerFeather;
+          float alpha = (baseLight + bloom) * pulse * outerFeather * uFade;
           gl_FragColor = vec4(color, alpha);
         }
       `,
@@ -300,7 +345,7 @@ export default function Home() {
     const eclipseMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      uniforms: { uTime: { value: 0 } },
+      uniforms: { uTime: { value: 0 }, uFade: { value: 1 } },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() {
@@ -312,6 +357,7 @@ export default function Home() {
         precision highp float;
         varying vec2 vUv;
         uniform float uTime;
+        uniform float uFade;
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float radius = length(p);
@@ -333,7 +379,7 @@ export default function Home() {
           color += chroma * interior * 0.105;
           color += vec3(0.22, 0.06, 0.05) * caustic * interior * 0.25;
           color += mix(vec3(0.08, 0.32, 0.38), vec3(0.7, 0.035, 0.018), bandBreak) * innerBand * 0.43;
-          float alpha = 0.82 + interior * 0.14;
+          float alpha = (0.82 + interior * 0.14) * uFade;
           gl_FragColor = vec4(color, alpha);
         }
       `,
@@ -341,6 +387,8 @@ export default function Home() {
 
     const architecture = new THREE.Group();
     scene.add(architecture);
+    const monument = new THREE.Group();
+    architecture.add(monument);
 
     const backgroundBoardMaterial = new THREE.ShaderMaterial({
       depthWrite: true,
@@ -373,40 +421,6 @@ export default function Home() {
     backgroundBoard.position.set(0, 1.6, -9.35);
     architecture.add(backgroundBoard);
 
-    const floorMaterial = new THREE.ShaderMaterial({
-      depthWrite: true,
-      toneMapped: false,
-      vertexShader: /* glsl */ `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        precision highp float;
-        varying vec2 vUv;
-        void main() {
-          vec2 lightOffset = vUv - vec2(0.638, 0.812);
-          float redPool = exp(-(
-            pow(lightOffset.x / 0.075, 2.0) + pow(lightOffset.y / 0.115, 2.0)
-          ));
-          float sourceCore = exp(-(
-            pow(lightOffset.x / 0.026, 2.0) + pow(lightOffset.y / 0.046, 2.0)
-          ));
-          float floorDepth = mix(0.52, 1.0, smoothstep(0.12, 0.92, vUv.y));
-          vec3 floorColor = vec3(0.032, 0.035, 0.035) * floorDepth;
-          floorColor += vec3(0.19, 0.006, 0.003) * redPool;
-          floorColor += vec3(0.34, 0.012, 0.006) * sourceCore;
-          gl_FragColor = vec4(floorColor, 1.0);
-        }
-      `,
-    });
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 24), floorMaterial);
-    floor.position.set(0, -4.95, -1.0);
-    floor.rotation.x = -Math.PI / 2;
-    architecture.add(floor);
-
     // A hand-built three-face monolith: one uninterrupted front plane faces
     // the viewer, while two widened side wings create the reverse perspective.
     const frontVertices = [-10.1, 8.6, 0.55, 0, -8.6, 2.0, 10.1, 8.6, 0.55];
@@ -423,9 +437,7 @@ export default function Home() {
     const frontGeometry = makeFaceGeometry(frontVertices, [0x111719, 0x030404, 0x100b0c]);
     const leftGeometry = makeFaceGeometry(leftVertices, [0x71868b, 0x020404, 0x071012]);
     const rightGeometry = makeFaceGeometry(rightVertices, [0x0b0202, 0x040202, 0x73110d]);
-    // Face-owned colour fields prevent a light intended for one side from
-    // leaking onto the front plane. The front receives only a dim ambient tint.
-    const pyramidFrontMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    // Each side owns its light field, preserving the reverse-perspective form.
     const makePointLitFaceMaterial = (
       baseColor: number,
       lightColor: number,
@@ -475,6 +487,13 @@ export default function Home() {
       new THREE.Vector2(-8.55, 3.15),
       2.32,
       1.66,
+    );
+    const pyramidFrontMaterial = makePointLitFaceMaterial(
+      0x070a0b,
+      0x87979a,
+      new THREE.Vector2(-12, 11),
+      8.5,
+      0.12,
     );
     const pyramidRightMaterial = makePointLitFaceMaterial(
       0x120403,
@@ -542,6 +561,8 @@ export default function Home() {
       );
       const coreMaterial = makeSeamMaterial(color, 0.31);
       const glowMaterial = makeSeamMaterial(color, 0.068);
+      coreMaterial.userData.baseOpacity = 0.31;
+      glowMaterial.userData.baseOpacity = 0.068;
       seamMaterials.push(coreMaterial, glowMaterial);
       for (const [radius, material] of [[0.014, coreMaterial], [0.065, glowMaterial]] as const) {
         const seam = new THREE.Mesh(
@@ -565,7 +586,7 @@ export default function Home() {
       new THREE.Vector3(0, -8.6, 2.0),
       0xff3027,
     );
-    architecture.add(pyramid);
+    monument.add(pyramid);
 
     const edgeMaterial = new THREE.LineBasicMaterial({
       color: 0x9faaa6,
@@ -573,9 +594,7 @@ export default function Home() {
       opacity: 0.055,
     });
     const pyramidEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pyramidGeometry, 20), edgeMaterial);
-    pyramidEdges.position.copy(pyramid.position);
-    pyramidEdges.rotation.copy(pyramid.rotation);
-    architecture.add(pyramidEdges);
+    pyramid.add(pyramidEdges);
 
     const redEdgeMaterial = new THREE.LineBasicMaterial({
       color: 0xff3529,
@@ -588,21 +607,19 @@ export default function Home() {
       new THREE.Vector3(13.25, 8.6, -0.85), new THREE.Vector3(0, -8.6, 2.0),
     ]);
     const pyramidRedEdges = new THREE.LineSegments(redEdgeGeometry, redEdgeMaterial);
-    pyramidRedEdges.position.copy(pyramid.position);
-    pyramidRedEdges.rotation.copy(pyramid.rotation);
     pyramidRedEdges.renderOrder = 2;
-    architecture.add(pyramidRedEdges);
+    pyramid.add(pyramidRedEdges);
 
     // The eclipse is physically behind the monolith. The opaque pyramid writes
     // depth first, masking the upper arc while the lower half escapes its tip.
     const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(6.32, 192), eclipseMaterial);
     eclipseDisc.position.set(0, 0.45, -8.62);
     eclipseDisc.renderOrder = 1;
-    architecture.add(eclipseDisc);
+    monument.add(eclipseDisc);
     const halo = new THREE.Mesh(new THREE.CircleGeometry(8.8, 224), haloMaterial);
     halo.position.set(0, 0.45, -8.5);
     halo.renderOrder = 2;
-    architecture.add(halo);
+    monument.add(halo);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
     const nameGeometry = createNameGeometry("SIWEI YUAN");
@@ -616,6 +633,8 @@ export default function Home() {
         uTime: { value: 0 },
         uPointer: { value: new THREE.Vector2(3, 3) },
         uPulse: { value: 0 },
+        uFade: { value: 1 },
+        uExit: { value: 0 },
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
@@ -662,31 +681,93 @@ export default function Home() {
     window.addEventListener("resize", resize);
     resize();
 
+    let targetScroll = window.scrollY;
+    const updateScrollStory = () => {
+      targetScroll = window.scrollY;
+      const viewportHeight = Math.max(window.innerHeight, 1);
+      document.querySelectorAll<HTMLElement>(".dossier-section").forEach((section) => {
+        const rect = section.getBoundingClientRect();
+        const travel = Math.max(section.offsetHeight - viewportHeight, 1);
+        const progress = THREE.MathUtils.clamp(-rect.top / travel, 0, 1);
+        const recordProgress = THREE.MathUtils.clamp((progress - 0.2) / 0.48, 0, 1);
+        section.style.setProperty("--section-progress", progress.toFixed(4));
+        section.style.setProperty("--records-progress", recordProgress.toFixed(4));
+        section.classList.toggle(
+          "is-visible",
+          rect.top < viewportHeight * 0.58 && rect.bottom > viewportHeight * 0.16,
+        );
+      });
+    };
+    window.addEventListener("scroll", updateScrollStory, { passive: true });
+    updateScrollStory();
+
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const startTime = performance.now();
+    const currentLookAt = new THREE.Vector3(0, 1.15, -5.8);
+    const idleCameraTarget = new THREE.Vector3();
+    const idleLookAtTarget = new THREE.Vector3();
+    let currentScroll = targetScroll;
     let animationFrame = 0;
     const animate = (timestamp: number) => {
       const elapsed = reduceMotion ? 0 : (timestamp - startTime) / 1000;
       currentPointer.lerp(targetPointer, reduceMotion ? 1 : 0.045);
-
+      currentScroll = THREE.MathUtils.lerp(currentScroll, targetScroll, reduceMotion ? 1 : 0.075);
+      const rawCollapse = THREE.MathUtils.clamp(
+        (currentScroll / Math.max(window.innerHeight, 1) - 0.06) / 0.78,
+        0,
+        1,
+      );
+      const collapse = rawCollapse * rawCollapse * (3 - 2 * rawCollapse);
+      const pointerWeight = 1 - collapse * 0.82;
       const baseZ = compact ? 20.4 : 17.2;
-      camera.position.x = THREE.MathUtils.lerp(camera.position.x, currentPointer.x * 1.05, 0.045);
-      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.8 + currentPointer.y * 0.58, 0.045);
-      camera.position.z = THREE.MathUtils.lerp(camera.position.z, baseZ + scrollRef.current * 2.4, 0.03);
-      camera.lookAt(currentPointer.x * -0.3, 1.15 + currentPointer.y * -0.18, -5.8);
+      idleCameraTarget.set(
+        currentPointer.x * 1.05,
+        1.8 + currentPointer.y * 0.58,
+        baseZ,
+      );
+      idleLookAtTarget.set(
+        currentPointer.x * -0.3,
+        1.15 + currentPointer.y * -0.18,
+        -5.8,
+      );
 
-      architecture.rotation.y = THREE.MathUtils.lerp(architecture.rotation.y, currentPointer.x * -0.042, 0.04);
-      architecture.rotation.x = THREE.MathUtils.lerp(architecture.rotation.x, currentPointer.y * 0.012, 0.04);
-      architecture.position.x = THREE.MathUtils.lerp(architecture.position.x, currentPointer.x * -0.28, 0.04);
+      architecture.rotation.y = THREE.MathUtils.lerp(
+        architecture.rotation.y,
+        currentPointer.x * -0.042 * pointerWeight,
+        0.04,
+      );
+      architecture.rotation.x = THREE.MathUtils.lerp(
+        architecture.rotation.x,
+        currentPointer.y * 0.012 * pointerWeight,
+        0.04,
+      );
+      architecture.position.x = THREE.MathUtils.lerp(
+        architecture.position.x,
+        currentPointer.x * -0.28 * pointerWeight,
+        0.04,
+      );
+      const monumentScale = THREE.MathUtils.lerp(1, compact ? 0.18 : 0.16, collapse);
+      monument.scale.setScalar(monumentScale);
+      monument.position.y = THREE.MathUtils.lerp(0, compact ? 9.0 : 8.7, collapse);
+      monument.position.z = THREE.MathUtils.lerp(0, -4.4, collapse);
+
+      camera.position.lerp(idleCameraTarget, reduceMotion ? 1 : 0.055);
+      currentLookAt.lerp(idleLookAtTarget, reduceMotion ? 1 : 0.055);
+      camera.lookAt(currentLookAt);
+
       namePoints.rotation.y = THREE.MathUtils.lerp(namePoints.rotation.y, currentPointer.x * 0.035, 0.06);
       namePoints.rotation.x = THREE.MathUtils.lerp(namePoints.rotation.x, currentPointer.y * -0.018, 0.06);
       nameMaterial.uniforms.uTime.value = elapsed;
       nameMaterial.uniforms.uPointer.value.copy(pointerActive ? currentPointer : restingNamePointer);
       pulseRef.current *= reduceMotion ? 0.7 : 0.935;
       nameMaterial.uniforms.uPulse.value = pulseRef.current;
+      nameMaterial.uniforms.uExit.value = collapse;
+      nameMaterial.uniforms.uFade.value = 1;
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
+      eclipseMaterial.uniforms.uFade.value = 1;
+      haloMaterial.uniforms.uFade.value = 1;
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
     };
@@ -696,6 +777,7 @@ export default function Home() {
       cancelAnimationFrame(animationFrame);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("scroll", updateScrollStory);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("resize", resize);
       nameGeometry.dispose();
@@ -706,7 +788,6 @@ export default function Home() {
       haloMaterial.dispose();
       eclipseMaterial.dispose();
       backgroundBoardMaterial.dispose();
-      floorMaterial.dispose();
       pyramidFrontMaterial.dispose();
       pyramidLeftMaterial.dispose();
       pyramidRightMaterial.dispose();
@@ -721,144 +802,49 @@ export default function Home() {
     };
   }, []);
 
-  useEffect(() => {
-    const updateScroll = () => {
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = maxScroll > 0 ? window.scrollY / maxScroll : 0;
-      scrollRef.current = progress;
-      document.documentElement.style.setProperty("--scroll-progress", `${progress}`);
-    };
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible?.target.id) setActiveSection(visible.target.id);
-      },
-      { rootMargin: "-25% 0px -55%", threshold: [0, 0.25, 0.6] },
-    );
-    navItems.forEach((id) => {
-      const section = document.getElementById(id);
-      if (section) observer.observe(section);
-    });
-    window.addEventListener("scroll", updateScroll, { passive: true });
-    updateScroll();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("scroll", updateScroll);
-    };
-  }, []);
-
   return (
     <div className="site-shell">
       <div ref={sceneMountRef} className="three-scene" aria-hidden="true" />
       <div className="atmosphere" aria-hidden="true" />
       <div className="film-grain" aria-hidden="true" />
-      <div className="scroll-meter" aria-hidden="true" />
       <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
 
-      <header className="topbar">
-        <nav aria-label="Main navigation">
-          {navItems.map((item) => (
-            <a key={item} href={`#${item}`} className={activeSection === item ? "active" : ""}>
-              <span>{item}</span>
-            </a>
-          ))}
-        </nav>
-      </header>
-
-      <main>
-        <section id="index" className="hero" aria-labelledby="hero-name">
-          <h1 id="hero-name" className="sr-only">Siwei Yuan</h1>
+      <main className="scroll-story">
+        <section className="hero-spacer" aria-labelledby="site-title">
+          <h1 id="site-title" className="sr-only">Siwei Yuan</h1>
         </section>
 
-        <section id="experience" className="content-section" aria-labelledby="experience-title">
-          <div className="section-rail">
-            <span>01</span>
-            <p>EXPERIENCE</p>
-          </div>
-          <div className="section-body">
-            <p className="section-kicker">Personnel record / controlled access</p>
-            <h2 id="experience-title">Experience</h2>
-            <div className="record-list">
-              <article>
-                <span>2024—NOW</span>
-                <h3>Current Role</h3>
-                <p>Company / title / the system or territory under your control.</p>
-                <em>ACTIVE</em>
-              </article>
-              <article>
-                <span>2021—2024</span>
-                <h3>Previous Chapter</h3>
-                <p>Company / title / one concrete intervention and its consequence.</p>
-                <em>SEALED / 02</em>
-              </article>
-              <article>
-                <span>2018—2021</span>
-                <h3>Origin Point</h3>
-                <p>Company / title / the formative work that established the trajectory.</p>
-                <em>SEALED / 01</em>
-              </article>
+        {dossierSections.map((section) => (
+          <section
+            key={section.id}
+            id={section.id}
+            className="dossier-section"
+            data-section={section.id}
+          >
+            <div className="dossier-sticky">
+              <header className="section-title-position">
+                <div className="section-title-hit">
+                  <span>{section.index}</span>
+                  <h2>{section.label}</h2>
+                </div>
+              </header>
+
+              <div className="dossier-records">
+                <p className="records-eyebrow">{section.eyebrow}</p>
+                <div className="records-list">
+                  {section.entries.map((entry, index) => (
+                    <article key={entry.title}>
+                      <b>0{index + 1}</b>
+                      <span>{entry.marker}</span>
+                      <h3>{entry.title}</h3>
+                      <p>{entry.detail}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </section>
-
-        <section id="projects" className="content-section projects-section" aria-labelledby="projects-title">
-          <div className="section-rail">
-            <span>02</span>
-            <p>PROJECTS</p>
-          </div>
-          <div className="section-body">
-            <p className="section-kicker">Case files / selected operations</p>
-            <h2 id="projects-title">Projects</h2>
-            <div className="project-grid">
-              {["A", "B", "C"].map((letter, index) => (
-                <article key={letter}>
-                  <b className="project-number">0{index + 1}</b>
-                  <span>CASE / {letter}</span>
-                  <h3>Untitled Artifact {letter}</h3>
-                  <p>Context / intervention / measurable consequence.</p>
-                  <em>FILE OPEN ↗</em>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="blogs" className="content-section" aria-labelledby="blogs-title">
-          <div className="section-rail">
-            <span>03</span>
-            <p>BLOGS</p>
-          </div>
-          <div className="section-body">
-            <p className="section-kicker">Field notes / public transmission</p>
-            <h2 id="blogs-title">Blogs</h2>
-            <div className="record-list">
-              <article>
-                <span>COMING SOON</span>
-                <h3>First Transmission</h3>
-                <p>Systems / design / technology / unfamiliar territory.</p>
-                <em>DRAFT / 01</em>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        <section id="contact" className="contact-section" aria-labelledby="contact-title">
-          <div className="contact-panel">
-            <p className="section-kicker">Contact / establish a strand</p>
-            <h2 id="contact-title">If the signal reaches you, answer.</h2>
-            <a href="mailto:hello@your-domain.com">hello@your-domain.com <span>↗</span></a>
-            <div>
-              <span>AVAILABLE FOR CONVERSATIONS</span>
-              <span>SHANGHAI / UTC+8</span>
-            </div>
-          </div>
-          <footer>
-            <span>© {new Date().getFullYear()} SIWEI YUAN</span>
-            <a href="#index">RETURN TO SURFACE ↑</a>
-          </footer>
-        </section>
+          </section>
+        ))}
       </main>
     </div>
   );

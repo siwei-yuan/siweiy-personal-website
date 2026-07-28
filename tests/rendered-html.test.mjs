@@ -26,8 +26,8 @@ test("server-renders the portfolio structure and metadata", async () => {
   assert.match(html, /Siwei Yuan/);
   assert.match(html, /id="experience"/);
   assert.match(html, /id="projects"/);
-  assert.match(html, /id="contact"/);
-  assert.match(html, /If the signal reaches you, answer\./);
+  assert.match(html, /id="blogs"/);
+  assert.match(html, /Current Role/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
