@@ -507,11 +507,11 @@ export default function Home() {
       0.12,
     );
     const pyramidRightMaterial = makePointLitFaceMaterial(
-      0x120403,
-      0xb51a14,
-      new THREE.Vector2(8.8, 3.1),
-      3.55,
-      0.62,
+      0x140504,
+      0xc31d16,
+      new THREE.Vector2(8.65, 2.9),
+      4.15,
+      0.84,
     );
     pyramidRightMaterial.uniforms.uBouncePosition.value.set(4.85, -3.95);
     pyramidRightMaterial.uniforms.uBounceRadius.value = 1.55;
