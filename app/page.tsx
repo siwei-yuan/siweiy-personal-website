@@ -761,7 +761,7 @@ export default function Home() {
         <nav aria-label="Main navigation">
           {navItems.map((item) => (
             <a key={item} href={`#${item}`} className={activeSection === item ? "active" : ""}>
-              {item}
+              <span>{item}</span>
             </a>
           ))}
         </nav>
