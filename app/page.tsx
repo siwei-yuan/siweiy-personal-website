@@ -20,20 +20,25 @@ const nameVertexShader = /* glsl */ `
   void main() {
     vec3 p = position;
 
-    // Give the word a living silhouette instead of a uniform strip. The outer
-    // letters are pulled sideways and taper toward the horizontal axis, while
-    // the centre breathes vertically around that same axis.
-    float horizontalEdge = clamp(abs(position.x) / 9.4, 0.0, 1.0);
+    // Wrap the word around a very flat, horizontal ellipsoid. The centre bulges
+    // toward the viewer while both ends curl back and taper into the equator.
+    float signedHorizontal = clamp(position.x / 9.6, -0.985, 0.985);
+    float horizontalEdge = abs(signedHorizontal);
+    float surfaceAngle = signedHorizontal * 1.12;
+    float surfaceProfile = pow(
+      max(1.0 - horizontalEdge * horizontalEdge, 0.015),
+      0.55
+    );
     float centreMass = 1.0 - smoothstep(0.02, 1.0, horizontalEdge);
-    float verticalEnvelope = mix(0.76, 1.48, pow(centreMass, 0.78));
+    float verticalEnvelope = mix(0.5, 1.32, surfaceProfile);
     float silhouetteBreath = 1.0
       + sin(uTime * 0.23 + position.x * 0.19) * (0.012 + centreMass * 0.028);
     float horizontalBreath = 0.08 + sin(uTime * 0.31 + horizontalEdge * 1.7) * 0.045;
-    p.x += sign(position.x) * (
-      pow(horizontalEdge, 1.45) * 0.48 + horizontalEdge * horizontalBreath
-    );
+    p.x = sin(surfaceAngle) / sin(1.12) * 9.6;
+    p.x += sign(position.x) * horizontalEdge * horizontalBreath;
     p.y *= verticalEnvelope * silhouetteBreath;
-    p.y += sin(position.x * 0.52 - uTime * 0.18) * (0.025 + centreMass * 0.055);
+    p.y += sin(position.x * 0.48 - uTime * 0.18) * (0.018 + centreMass * 0.04);
+    p.z += (cos(surfaceAngle) - cos(1.12)) * 1.34;
 
     vec2 normalizedText = vec2(p.x / 10.0, p.y / 3.0);
     vec2 delta = normalizedText - uPointer;
@@ -129,7 +134,7 @@ const nameFragmentShader = /* glsl */ `
   }
 `;
 
-const navItems = ["experience", "projects", "contact"] as const;
+const navItems = ["experience", "projects", "blogs", "contact"] as const;
 
 function createNameGeometry(label: string) {
   const canvas = document.createElement("canvas");
@@ -312,7 +317,7 @@ export default function Home() {
           float radius = length(p);
           if (radius > 1.0) discard;
           float angle = atan(p.y, p.x);
-          float gravity = 0.09 / max(radius, 0.085);
+          float gravity = 0.122 / max(radius, 0.085);
           float foldedX = p.x + sin(p.y * 13.0 + uTime * 0.3) * gravity;
           float foldedY = p.y + sin(p.x * 9.0 - uTime * 0.22) * gravity * 0.65;
           float bandR = sin(foldedY * 38.0 + foldedX * 8.0 + uTime * 0.45);
@@ -320,14 +325,14 @@ export default function Home() {
           float bandB = sin(foldedY * 38.0 + foldedX * 8.0 + uTime * 0.45 + 1.8);
           vec3 chroma = vec3(bandR, bandG, bandB) * 0.5 + 0.5;
           float caustic = pow(max(0.0, sin(angle * 5.0 + 5.0 / (radius + 0.16) - uTime * 0.35)), 7.0);
-          float warpedBandRadius = radius + sin(angle * 3.0 - uTime * 0.28) * 0.022;
+          float warpedBandRadius = radius + sin(angle * 3.0 - uTime * 0.28) * 0.032;
           float innerBand = exp(-abs(warpedBandRadius - 0.56) * 31.0);
           float bandBreak = 0.58 + 0.42 * sin(angle * 7.0 + uTime * 0.4);
           float interior = 1.0 - smoothstep(0.58, 0.98, radius);
           vec3 color = vec3(0.006, 0.009, 0.011);
-          color += chroma * interior * 0.075;
-          color += vec3(0.22, 0.06, 0.05) * caustic * interior * 0.18;
-          color += mix(vec3(0.08, 0.32, 0.38), vec3(0.7, 0.035, 0.018), bandBreak) * innerBand * 0.34;
+          color += chroma * interior * 0.105;
+          color += vec3(0.22, 0.06, 0.05) * caustic * interior * 0.25;
+          color += mix(vec3(0.08, 0.32, 0.38), vec3(0.7, 0.035, 0.018), bandBreak) * innerBand * 0.43;
           float alpha = 0.82 + interior * 0.14;
           gl_FragColor = vec4(color, alpha);
         }
@@ -356,8 +361,63 @@ export default function Home() {
     // Face-owned colour fields prevent a light intended for one side from
     // leaking onto the front plane. The front receives only a dim ambient tint.
     const pyramidFrontMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
-    const pyramidLeftMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
-    const pyramidRightMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const makePointLitFaceMaterial = (
+      baseColor: number,
+      lightColor: number,
+      lightPosition: THREE.Vector2,
+      radius: number,
+      strength: number,
+    ) => new THREE.ShaderMaterial({
+      uniforms: {
+        uBaseColor: { value: new THREE.Color(baseColor) },
+        uLightColor: { value: new THREE.Color(lightColor) },
+        uLightPosition: { value: lightPosition },
+        uRadius: { value: radius },
+        uStrength: { value: strength },
+      },
+      vertexShader: /* glsl */ `
+        varying vec3 vLocalPosition;
+        void main() {
+          vLocalPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec3 vLocalPosition;
+        uniform vec3 uBaseColor;
+        uniform vec3 uLightColor;
+        uniform vec2 uLightPosition;
+        uniform float uRadius;
+        uniform float uStrength;
+        void main() {
+          float lightDistance = distance(vLocalPosition.xy, uLightPosition);
+          float localFalloff = exp(-pow(lightDistance / uRadius, 2.0));
+          float sourceCore = exp(-pow(lightDistance / (uRadius * 0.28), 2.0));
+          float lowerFog = smoothstep(-8.2, -1.6, vLocalPosition.y);
+          float surfaceVariation = 0.97
+            + sin(vLocalPosition.x * 3.1 + vLocalPosition.y * 1.7) * 0.018;
+          vec3 color = uBaseColor
+            + uLightColor * (localFalloff * 0.24 + sourceCore * 0.18) * uStrength;
+          color *= mix(0.38, 1.0, lowerFog) * surfaceVariation;
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+    });
+    const pyramidLeftMaterial = makePointLitFaceMaterial(
+      0x081012,
+      0x82979b,
+      new THREE.Vector2(-8.55, 3.15),
+      2.32,
+      1.66,
+    );
+    const pyramidRightMaterial = makePointLitFaceMaterial(
+      0x120403,
+      0xb51a14,
+      new THREE.Vector2(8.8, 3.1),
+      3.55,
+      0.62,
+    );
     const pyramidGeometry = new THREE.BufferGeometry();
     pyramidGeometry.setAttribute(
       "position",
@@ -378,7 +438,36 @@ export default function Home() {
       pyramid.add(face);
     }
 
-    const seamMaterials: THREE.MeshBasicMaterial[] = [];
+    const seamMaterials: THREE.ShaderMaterial[] = [];
+    const makeSeamMaterial = (color: number, opacity: number) => new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uOpacity: { value: opacity },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        uniform vec3 uColor;
+        uniform float uOpacity;
+        void main() {
+          float endFade = smoothstep(0.02, 0.18, vUv.y)
+            * (1.0 - smoothstep(0.82, 0.98, vUv.y));
+          float illuminatedSection = exp(-pow((vUv.y - 0.58) / 0.245, 2.0));
+          float alpha = uOpacity * endFade * (0.055 + illuminatedSection * 0.945);
+          gl_FragColor = vec4(uColor, alpha);
+        }
+      `,
+    });
     const addGlowingSeam = (start: THREE.Vector3, end: THREE.Vector3, color: number) => {
       const direction = end.clone().sub(start);
       const midpoint = start.clone().add(end).multiplyScalar(0.5);
@@ -386,20 +475,8 @@ export default function Home() {
         new THREE.Vector3(0, 1, 0),
         direction.clone().normalize(),
       );
-      const coreMaterial = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.48,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
-      const glowMaterial = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.085,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-      });
+      const coreMaterial = makeSeamMaterial(color, 0.31);
+      const glowMaterial = makeSeamMaterial(color, 0.068);
       seamMaterials.push(coreMaterial, glowMaterial);
       for (const [radius, material] of [[0.014, coreMaterial], [0.065, glowMaterial]] as const) {
         const seam = new THREE.Mesh(
@@ -428,7 +505,7 @@ export default function Home() {
     const edgeMaterial = new THREE.LineBasicMaterial({
       color: 0x9faaa6,
       transparent: true,
-      opacity: 0.22,
+      opacity: 0.055,
     });
     const pyramidEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pyramidGeometry, 20), edgeMaterial);
     pyramidEdges.position.copy(pyramid.position);
@@ -438,7 +515,7 @@ export default function Home() {
     const redEdgeMaterial = new THREE.LineBasicMaterial({
       color: 0xff3529,
       transparent: true,
-      opacity: 0.13,
+      opacity: 0.045,
       blending: THREE.AdditiveBlending,
     });
     const redEdgeGeometry = new THREE.BufferGeometry().setFromPoints([
@@ -614,40 +691,18 @@ export default function Home() {
       <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
 
       <header className="topbar">
-        <a className="brand" href="#index" aria-label="Back to Siwei Yuan home">
-          <i /> SIWEI YUAN <span>/ ARCHIVE</span>
-        </a>
         <nav aria-label="Main navigation">
-          {navItems.map((item, index) => (
+          {navItems.map((item) => (
             <a key={item} href={`#${item}`} className={activeSection === item ? "active" : ""}>
-              <span>0{index + 1}</span>{item}
+              {item}
             </a>
           ))}
         </nav>
-        <p className="system-status"><i /> SCENE / LIVE</p>
       </header>
 
       <main>
         <section id="index" className="hero" aria-labelledby="hero-name">
           <h1 id="hero-name" className="sr-only">Siwei Yuan</h1>
-          <div className="hero-frame" aria-hidden="true" />
-          <div className="hero-label label-left">
-            <span>SUBJECT / 001</span>
-            <span>SIWEI YUAN</span>
-          </div>
-          <div className="hero-label label-right">
-            <span>SHANGHAI</span>
-            <span>UTC +08:00</span>
-          </div>
-          <div className="interaction-note">
-            <i />
-            <span>MOVE TO SHIFT THE HOUSE</span>
-            <span>CLICK TO DISPERSE SIGNAL</span>
-          </div>
-          <a className="scroll-cue" href="#experience">
-            <span>ENTER ARCHIVE</span>
-            <i />
-          </a>
         </section>
 
         <section id="experience" className="content-section" aria-labelledby="experience-title">
@@ -698,6 +753,25 @@ export default function Home() {
                   <p>Case study placeholder · context, intervention, consequence.</p>
                 </article>
               ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="blogs" className="content-section" aria-labelledby="blogs-title">
+          <div className="section-rail">
+            <span>03</span>
+            <p>BLOGS</p>
+          </div>
+          <div className="section-body">
+            <p className="section-kicker">Notes / transmissions</p>
+            <h2 id="blogs-title">Thoughts still finding their form.</h2>
+            <div className="record-list">
+              <article>
+                <span>COMING SOON</span>
+                <h3>First Transmission</h3>
+                <p>Writing about systems, design, technology, and the unfamiliar.</p>
+                <em>DRAFT / 001</em>
+              </article>
             </div>
           </div>
         </section>
