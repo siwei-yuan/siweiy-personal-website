@@ -19,6 +19,19 @@ const nameVertexShader = /* glsl */ `
 
   void main() {
     vec3 p = position;
+
+    // Give the word a living silhouette instead of a uniform strip. The outer
+    // letters are pulled sideways and taper toward the horizontal axis, while
+    // the centre breathes vertically around that same axis.
+    float horizontalEdge = clamp(abs(position.x) / 9.4, 0.0, 1.0);
+    float centreMass = 1.0 - smoothstep(0.02, 1.0, horizontalEdge);
+    float verticalEnvelope = mix(0.76, 1.48, pow(centreMass, 0.78));
+    float silhouetteBreath = 1.0
+      + sin(uTime * 0.23 + position.x * 0.19) * (0.012 + centreMass * 0.028);
+    p.x += sign(position.x) * pow(horizontalEdge, 1.55) * 0.34;
+    p.y *= verticalEnvelope * silhouetteBreath;
+    p.y += sin(position.x * 0.52 - uTime * 0.18) * (0.025 + centreMass * 0.055);
+
     vec2 normalizedText = vec2(p.x / 10.0, p.y / 3.0);
     vec2 delta = normalizedText - uPointer;
     float pointerDistance = length(delta);
@@ -239,25 +252,27 @@ export default function Home() {
           float radialDistortion = sin(angle * 3.0 + uTime * 0.16) * 0.0035
             + sin(angle * 11.0 - uTime * 0.21) * 0.0018;
           float warpedRadius = radius + radialDistortion;
-          float core = exp(-abs(warpedRadius - 0.925) * 235.0);
-          float closeGlow = exp(-abs(warpedRadius - 0.925) * 54.0);
-          float farGlow = exp(-abs(warpedRadius - 0.925) * 17.0);
-          float scatterGlow = exp(-abs(warpedRadius - 0.925) * 8.5);
-          float facingLowerRight = max(0.0, cos(angle + 0.76));
-          float shoulder = pow(facingLowerRight, 2.15);
-          float whiteHot = pow(facingLowerRight, 7.25);
+          float ringDistance = warpedRadius - 0.735;
+          float core = exp(-pow(ringDistance / 0.0038, 2.0));
+          float closeGlow = exp(-pow(ringDistance / 0.021, 2.0));
+          float farGlow = exp(-pow(ringDistance / 0.059, 2.0));
+          float scatterGlow = exp(-pow(ringDistance / 0.108, 2.0));
+          float angularLight = cos(angle + 0.76) * 0.5 + 0.5;
+          float shoulder = smoothstep(0.18, 0.94, angularLight);
+          float whiteHot = smoothstep(0.48, 0.985, angularLight);
+          whiteHot *= whiteHot;
           float pulse = 0.94 + sin(uTime * 0.43) * 0.06;
-          vec3 dimLine = vec3(0.46, 0.43, 0.41);
+          vec3 dimLine = vec3(0.66, 0.63, 0.6);
           vec3 ember = vec3(0.78, 0.022, 0.01);
           vec3 white = vec3(1.46, 1.4, 1.32);
           vec3 color = mix(dimLine, ember, shoulder);
           color = mix(color, white, whiteHot);
-          float baseLight = core * (0.068 + shoulder * 0.42 + whiteHot * 1.48);
-          float bloom = closeGlow * (0.011 + shoulder * 0.24 + whiteHot * 0.7)
-            + farGlow * (shoulder * 0.085 + whiteHot * 0.24)
-            + scatterGlow * whiteHot * 0.135;
-          float alpha = (baseLight + bloom) * pulse;
-          if (alpha < 0.002) discard;
+          float baseLight = core * (0.12 + shoulder * 0.36 + whiteHot * 1.28);
+          float bloom = closeGlow * (0.014 + shoulder * 0.21 + whiteHot * 0.68)
+            + farGlow * (shoulder * 0.086 + whiteHot * 0.25)
+            + scatterGlow * (shoulder * 0.018 + whiteHot * 0.12);
+          float outerFeather = 1.0 - smoothstep(0.93, 0.995, radius);
+          float alpha = (baseLight + bloom) * pulse * outerFeather;
           gl_FragColor = vec4(color, alpha);
         }
       `,
@@ -309,35 +324,25 @@ export default function Home() {
 
     // A hand-built three-face monolith: one uninterrupted front plane faces
     // the viewer, while two widened side wings create the reverse perspective.
-    const pyramidFrontMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x202b2e,
-      roughness: 0.42,
-      metalness: 0.68,
-      clearcoat: 0.28,
-      clearcoatRoughness: 0.28,
-      flatShading: true,
-    });
-    const pyramidLeftMaterial = pyramidFrontMaterial.clone();
-    pyramidLeftMaterial.color.setHex(0x293a3f);
-    pyramidLeftMaterial.emissive.setHex(0x071014);
-    pyramidLeftMaterial.emissiveIntensity = 0.24;
-    const pyramidRightMaterial = pyramidFrontMaterial.clone();
-    pyramidRightMaterial.color.setHex(0x231719);
-    pyramidRightMaterial.emissive.setHex(0x290403);
-    pyramidRightMaterial.emissiveIntensity = 0.17;
-
     const frontVertices = [-10.1, 8.6, 0.55, 0, -8.6, 2.0, 10.1, 8.6, 0.55];
     const leftVertices = [-13.25, 8.6, -0.85, 0, -8.6, 2.0, -10.1, 8.6, 0.55];
     const rightVertices = [10.1, 8.6, 0.55, 0, -8.6, 2.0, 13.25, 8.6, -0.85];
-    const makeFaceGeometry = (vertices: number[]) => {
+    const makeFaceGeometry = (vertices: number[], colors: number[]) => {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+      const colorValues = colors.flatMap((color) => new THREE.Color(color).toArray());
+      geometry.setAttribute("color", new THREE.Float32BufferAttribute(colorValues, 3));
       geometry.computeVertexNormals();
       return geometry;
     };
-    const frontGeometry = makeFaceGeometry(frontVertices);
-    const leftGeometry = makeFaceGeometry(leftVertices);
-    const rightGeometry = makeFaceGeometry(rightVertices);
+    const frontGeometry = makeFaceGeometry(frontVertices, [0x111719, 0x030404, 0x100b0c]);
+    const leftGeometry = makeFaceGeometry(leftVertices, [0x60767c, 0x030607, 0x26383d]);
+    const rightGeometry = makeFaceGeometry(rightVertices, [0x260504, 0x050303, 0x6f100c]);
+    // Face-owned colour fields prevent a light intended for one side from
+    // leaking onto the front plane. The front receives only a dim ambient tint.
+    const pyramidFrontMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const pyramidLeftMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const pyramidRightMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
     const pyramidGeometry = new THREE.BufferGeometry();
     pyramidGeometry.setAttribute(
       "position",
@@ -391,47 +396,10 @@ export default function Home() {
     eclipseDisc.position.set(0, 0.45, -8.62);
     eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.CircleGeometry(6.98, 224), haloMaterial);
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(8.8, 224), haloMaterial);
     halo.position.set(0, 0.45, -8.5);
     halo.renderOrder = 2;
     architecture.add(halo);
-
-    const ambientLight = new THREE.HemisphereLight(0x687773, 0x020303, 0.72);
-    ambientLight.layers.set(0);
-    scene.add(ambientLight);
-
-    const keyLight = new THREE.DirectionalLight(0x9eafb2, 0.18);
-    keyLight.layers.set(0);
-    keyLight.position.set(-8, 13, 8);
-    keyLight.castShadow = !compact;
-    keyLight.shadow.mapSize.set(1536, 1536);
-    keyLight.shadow.camera.left = -16;
-    keyLight.shadow.camera.right = 16;
-    keyLight.shadow.camera.top = 17;
-    keyLight.shadow.camera.bottom = -10;
-    scene.add(keyLight);
-
-    const coldFill = new THREE.DirectionalLight(0x738e96, 1.15);
-    coldFill.layers.set(1);
-    coldFill.position.set(-10, 4, 5);
-    scene.add(coldFill);
-
-    const frontFill = new THREE.DirectionalLight(0xaab8b5, 0.12);
-    frontFill.layers.set(0);
-    frontFill.position.set(2, 5, 12);
-    scene.add(frontFill);
-
-    const redFaceLight = new THREE.DirectionalLight(0xff2b20, 2.05);
-    redFaceLight.layers.set(2);
-    redFaceLight.position.set(10, 2.2, 7);
-    redFaceLight.target.position.set(-1.4, 1.2, -6.15);
-    scene.add(redFaceLight, redFaceLight.target);
-
-    const coldSurfaceLight = new THREE.SpotLight(0xaec4ca, 180, 45, Math.PI * 0.42, 0.92, 1.5);
-    coldSurfaceLight.layers.set(1);
-    coldSurfaceLight.position.set(-10, 8, 9);
-    coldSurfaceLight.target.position.set(-4.5, 3.2, -6.1);
-    scene.add(coldSurfaceLight, coldSurfaceLight.target);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
     const nameGeometry = createNameGeometry("SIWEI YUAN");
@@ -516,8 +484,6 @@ export default function Home() {
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
-      redFaceLight.intensity = 1.9 + Math.sin(elapsed * 0.29) * 0.17;
-
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
     };
