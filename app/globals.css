@@ -191,7 +191,6 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 .dossier-section {
-  --section-progress: 0;
   --records-progress: 0;
   position: relative;
   min-height: 215svh;
@@ -211,9 +210,7 @@ body::selection { background: var(--red); color: #fff; }
   display: grid;
   place-items: center;
   padding: 0 2.5vw;
-  transform: translateY(calc(var(--section-progress) * -36.5vh));
   pointer-events: none;
-  will-change: transform;
 }
 
 .section-title-hit {
@@ -223,12 +220,10 @@ body::selection { background: var(--red); color: #fff; }
   justify-content: center;
   width: 100%;
   opacity: 0;
-  transform: scale(calc(1 - var(--section-progress) * .63));
-  transform-origin: 50% 0;
-  will-change: transform, opacity;
+  will-change: opacity;
 }
 
-.dossier-section.is-visible .section-title-hit { opacity: 1; }
+.dossier-section.is-title-visible .section-title-hit { opacity: 1; }
 
 .section-title-hit > span {
   position: absolute;
@@ -255,7 +250,7 @@ body::selection { background: var(--red); color: #fff; }
   text-shadow: 0 0 24px rgba(180,209,214,.08);
 }
 
-.dossier-section.is-visible .section-title-hit h2 {
+.dossier-section.is-title-visible .section-title-hit h2 {
   animation: title-impact 430ms cubic-bezier(.1,.75,.16,1) both;
 }
 
@@ -351,7 +346,6 @@ body::selection { background: var(--red); color: #fff; }
 @media (max-width: 760px) {
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
-  .section-title-position { transform: translateY(calc(var(--section-progress) * -35vh)); }
   .section-title-hit h2 { font-size: clamp(3.4rem, 16.2vw, 6rem); letter-spacing: -.075em; }
   .section-title-hit > span { left: 0; }
   .dossier-records { top: 25vh; left: 16px; right: 16px; }

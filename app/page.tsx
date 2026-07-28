@@ -703,12 +703,12 @@ export default function Home() {
         const rect = section.getBoundingClientRect();
         const travel = Math.max(section.offsetHeight - viewportHeight, 1);
         const progress = THREE.MathUtils.clamp(-rect.top / travel, 0, 1);
-        const recordProgress = THREE.MathUtils.clamp((progress - 0.2) / 0.48, 0, 1);
-        section.style.setProperty("--section-progress", progress.toFixed(4));
+        const titleVisible = rect.top <= 0 && progress < 0.34;
+        const recordProgress = THREE.MathUtils.clamp((progress - 0.42) / 0.34, 0, 1);
         section.style.setProperty("--records-progress", recordProgress.toFixed(4));
         section.classList.toggle(
-          "is-visible",
-          rect.top < viewportHeight * 0.58 && rect.bottom > viewportHeight * 0.16,
+          "is-title-visible",
+          titleVisible,
         );
       });
     };
