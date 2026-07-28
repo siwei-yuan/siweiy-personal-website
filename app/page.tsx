@@ -28,7 +28,10 @@ const nameVertexShader = /* glsl */ `
     float verticalEnvelope = mix(0.76, 1.48, pow(centreMass, 0.78));
     float silhouetteBreath = 1.0
       + sin(uTime * 0.23 + position.x * 0.19) * (0.012 + centreMass * 0.028);
-    p.x += sign(position.x) * pow(horizontalEdge, 1.55) * 0.34;
+    float horizontalBreath = 0.08 + sin(uTime * 0.31 + horizontalEdge * 1.7) * 0.045;
+    p.x += sign(position.x) * (
+      pow(horizontalEdge, 1.45) * 0.48 + horizontalEdge * horizontalBreath
+    );
     p.y *= verticalEnvelope * silhouetteBreath;
     p.y += sin(position.x * 0.52 - uTime * 0.18) * (0.025 + centreMass * 0.055);
 
@@ -253,24 +256,36 @@ export default function Home() {
             + sin(angle * 11.0 - uTime * 0.21) * 0.0018;
           float warpedRadius = radius + radialDistortion;
           float ringDistance = warpedRadius - 0.735;
+          float angularLight = cos(angle + 0.76) * 0.5 + 0.5;
+          float shoulder = pow(angularLight, 7.5);
+          float whiteHot = pow(angularLight, 30.0);
           float core = exp(-pow(ringDistance / 0.0038, 2.0));
           float closeGlow = exp(-pow(ringDistance / 0.021, 2.0));
           float farGlow = exp(-pow(ringDistance / 0.059, 2.0));
-          float scatterGlow = exp(-pow(ringDistance / 0.108, 2.0));
-          float angularLight = cos(angle + 0.76) * 0.5 + 0.5;
-          float shoulder = smoothstep(0.18, 0.94, angularLight);
-          float whiteHot = smoothstep(0.48, 0.985, angularLight);
-          whiteHot *= whiteHot;
+          float scatterGlow = exp(-pow(ringDistance / 0.118, 2.0));
+
+          vec2 hotDirection = normalize(vec2(cos(-0.76), sin(-0.76)));
+          vec2 hotTangent = vec2(-hotDirection.y, hotDirection.x);
+          vec2 hotOffset = p - hotDirection * 0.735;
+          float hotRadial = dot(hotOffset, hotDirection);
+          float hotAlongRing = dot(hotOffset, hotTangent);
+          float ovalCore = exp(-(
+            pow(hotRadial / 0.026, 2.0) + pow(hotAlongRing / 0.105, 2.0)
+          ));
+          float ovalBloom = exp(-(
+            pow(hotRadial / 0.082, 2.0) + pow(hotAlongRing / 0.205, 2.0)
+          ));
           float pulse = 0.94 + sin(uTime * 0.43) * 0.06;
           vec3 dimLine = vec3(0.66, 0.63, 0.6);
           vec3 ember = vec3(0.78, 0.022, 0.01);
           vec3 white = vec3(1.46, 1.4, 1.32);
           vec3 color = mix(dimLine, ember, shoulder);
-          color = mix(color, white, whiteHot);
-          float baseLight = core * (0.12 + shoulder * 0.36 + whiteHot * 1.28);
-          float bloom = closeGlow * (0.014 + shoulder * 0.21 + whiteHot * 0.68)
-            + farGlow * (shoulder * 0.086 + whiteHot * 0.25)
-            + scatterGlow * (shoulder * 0.018 + whiteHot * 0.12);
+          color = mix(color, white, max(whiteHot, ovalCore));
+          float baseLight = core * (0.12 + shoulder * 0.36 + whiteHot * 0.72);
+          float bloom = closeGlow * (0.014 + shoulder * 0.19 + whiteHot * 0.31)
+            + farGlow * (shoulder * 0.072 + whiteHot * 0.12)
+            + scatterGlow * (shoulder * 0.014 + whiteHot * 0.055)
+            + ovalCore * 0.68 + ovalBloom * 0.16;
           float outerFeather = 1.0 - smoothstep(0.93, 0.995, radius);
           float alpha = (baseLight + bloom) * pulse * outerFeather;
           gl_FragColor = vec4(color, alpha);
@@ -336,8 +351,8 @@ export default function Home() {
       return geometry;
     };
     const frontGeometry = makeFaceGeometry(frontVertices, [0x111719, 0x030404, 0x100b0c]);
-    const leftGeometry = makeFaceGeometry(leftVertices, [0x60767c, 0x030607, 0x26383d]);
-    const rightGeometry = makeFaceGeometry(rightVertices, [0x260504, 0x050303, 0x6f100c]);
+    const leftGeometry = makeFaceGeometry(leftVertices, [0x71868b, 0x020404, 0x071012]);
+    const rightGeometry = makeFaceGeometry(rightVertices, [0x0b0202, 0x040202, 0x73110d]);
     // Face-owned colour fields prevent a light intended for one side from
     // leaking onto the front plane. The front receives only a dim ambient tint.
     const pyramidFrontMaterial = new THREE.MeshBasicMaterial({ vertexColors: true });
@@ -362,6 +377,52 @@ export default function Home() {
       face.receiveShadow = !compact;
       pyramid.add(face);
     }
+
+    const seamMaterials: THREE.MeshBasicMaterial[] = [];
+    const addGlowingSeam = (start: THREE.Vector3, end: THREE.Vector3, color: number) => {
+      const direction = end.clone().sub(start);
+      const midpoint = start.clone().add(end).multiplyScalar(0.5);
+      const orientation = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 1, 0),
+        direction.clone().normalize(),
+      );
+      const coreMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.48,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const glowMaterial = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.085,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      seamMaterials.push(coreMaterial, glowMaterial);
+      for (const [radius, material] of [[0.014, coreMaterial], [0.065, glowMaterial]] as const) {
+        const seam = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius, radius, direction.length(), 8, 1, true),
+          material,
+        );
+        seam.position.copy(midpoint);
+        seam.position.z += 0.045;
+        seam.quaternion.copy(orientation);
+        seam.renderOrder = 4;
+        pyramid.add(seam);
+      }
+    };
+    addGlowingSeam(
+      new THREE.Vector3(-10.1, 8.6, 0.55),
+      new THREE.Vector3(0, -8.6, 2.0),
+      0x91b5bc,
+    );
+    addGlowingSeam(
+      new THREE.Vector3(10.1, 8.6, 0.55),
+      new THREE.Vector3(0, -8.6, 2.0),
+      0xff3027,
+    );
     architecture.add(pyramid);
 
     const edgeMaterial = new THREE.LineBasicMaterial({
@@ -510,6 +571,7 @@ export default function Home() {
       edgeMaterial.dispose();
       redEdgeGeometry.dispose();
       redEdgeMaterial.dispose();
+      seamMaterials.forEach((material) => material.dispose());
       renderer.dispose();
       renderer.domElement.remove();
     };
