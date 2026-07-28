@@ -431,8 +431,6 @@ export default function Home() {
     };
     const onPointerDown = () => {
       pulseRef.current = 1;
-      cursorRef.current?.classList.add("is-pulsing");
-      window.setTimeout(() => cursorRef.current?.classList.remove("is-pulsing"), 360);
     };
     const onPointerLeave = () => {
       pointerActive = false;
