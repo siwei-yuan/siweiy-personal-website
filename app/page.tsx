@@ -5,6 +5,9 @@ import * as THREE from "three";
 
 const nameVertexShader = /* glsl */ `
   attribute float aSeed;
+  attribute float aMotion;
+  attribute float aSpeed;
+  attribute float aSize;
   uniform float uTime;
   uniform vec2 uPointer;
   uniform float uPulse;
@@ -36,19 +39,21 @@ const nameVertexShader = /* glsl */ `
       sin(aSeed * 91.7 + 0.6),
       cos(aSeed * 73.1 - 0.4)
     ));
-    float randomWalkX = sin(uTime * (0.31 + aSeed * 0.61) + aSeed * 97.0)
-      + sin(uTime * (1.07 + aSeed * 0.27) + aSeed * 41.0) * 0.38;
-    float randomWalkY = cos(uTime * (0.28 + aSeed * 0.57) + aSeed * 83.0)
-      + sin(uTime * (0.93 + aSeed * 0.33) + aSeed * 59.0) * 0.36;
+    float particleSpeed = mix(0.16, 1.38, aSpeed);
+    float particleRange = mix(0.012, 0.19, pow(aMotion, 1.7));
+    float randomWalkX = sin(uTime * particleSpeed + aSeed * 97.0)
+      + sin(uTime * particleSpeed * 2.73 + aSeed * 41.0) * 0.38;
+    float randomWalkY = cos(uTime * particleSpeed * 0.87 + aSeed * 83.0)
+      + sin(uTime * particleSpeed * 2.11 + aSeed * 59.0) * 0.36;
     vec2 localField = vec2(
       sin(position.y * 2.6 + uTime * 0.54 + sin(position.x * 0.72)),
       cos(position.x * 1.45 - uTime * 0.47 + sin(position.y * 1.8))
     );
     float driftEnergy = 0.5 + 0.5 * sin(uTime * 0.39 + aSeed * 17.0);
-    p.xy += vec2(randomWalkX, randomWalkY) * (0.027 + aSeed * 0.024);
-    p.xy += localField * (0.034 + driftEnergy * 0.027);
-    p.xy += seedDirection * sin(uTime * 0.22 + aSeed * 23.0) * 0.022;
-    p.z += (randomWalkX - randomWalkY) * 0.028 + localField.x * 0.04;
+    p.xy += vec2(randomWalkX, randomWalkY) * particleRange;
+    p.xy += localField * particleRange * (0.32 + driftEnergy * 0.38);
+    p.xy += seedDirection * sin(uTime * particleSpeed * 0.7 + aSeed * 23.0) * particleRange * 0.28;
+    p.z += ((randomWalkX - randomWalkY) * 0.38 + localField.x * 0.28) * particleRange;
 
     // Only a small subset crosses the lens. Most of the word remains anchored;
     // selected particles skim the rim, while a rarer group falls toward the core.
@@ -74,7 +79,7 @@ const nameVertexShader = /* glsl */ `
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
     float glowParticle = step(0.974, aSeed);
-    gl_PointSize = (1.08 + aSeed * 0.54 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.5) * (24.0 / -viewPosition.z);
+    gl_PointSize = (0.82 + aSize * 1.05 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.5) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring + horizon * rimParticle * 0.46 + innerBand * fallingParticle * 0.5;
@@ -144,25 +149,34 @@ function createNameGeometry(label: string) {
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
   const positions: number[] = [];
   const seeds: number[] = [];
-  const step = 5;
+  const motions: number[] = [];
+  const speeds: number[] = [];
+  const sizes: number[] = [];
 
-  for (let y = 0; y < canvas.height; y += step) {
-    for (let x = 0; x < canvas.width; x += step) {
-      const alpha = pixels[(y * canvas.width + x) * 4 + 3];
-      if (alpha > 96 && Math.random() > 0.07) {
-        const jitter = step * 0.18;
-        positions.push(
-          ((x - canvas.width / 2 + (Math.random() - 0.5) * jitter) / canvas.width) * 20.0,
-          (-(y - canvas.height / 2 + (Math.random() - 0.5) * jitter) / canvas.height) * 6.0,
-          (Math.random() - 0.5) * 0.14,
-        );
-        seeds.push(Math.random());
-      }
+  // Random sampling removes the hidden grid completely. Natural clustering and
+  // gaps become part of the silhouette instead of an artificial dot matrix.
+  for (let attempt = 0; attempt < 32_000; attempt += 1) {
+    const x = Math.floor(Math.random() * canvas.width);
+    const y = Math.floor(Math.random() * canvas.height);
+    const alpha = pixels[(y * canvas.width + x) * 4 + 3];
+    if (alpha > 96) {
+      positions.push(
+        ((x - canvas.width / 2) / canvas.width) * 20.0,
+        (-(y - canvas.height / 2) / canvas.height) * 6.0,
+        (Math.random() - 0.5) * 0.3,
+      );
+      seeds.push(Math.random());
+      motions.push(Math.random());
+      speeds.push(Math.random());
+      sizes.push(Math.pow(Math.random(), 1.35));
     }
   }
 
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(seeds, 1));
+  geometry.setAttribute("aMotion", new THREE.Float32BufferAttribute(motions, 1));
+  geometry.setAttribute("aSpeed", new THREE.Float32BufferAttribute(speeds, 1));
+  geometry.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -206,52 +220,39 @@ export default function Home() {
       depthTest: true,
       uniforms: { uTime: { value: 0 } },
       vertexShader: /* glsl */ `
-        varying vec3 vLocalPosition;
+        varying vec2 vUv;
         void main() {
-          vLocalPosition = position;
+          vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
       fragmentShader: /* glsl */ `
         precision highp float;
-        varying vec3 vLocalPosition;
+        varying vec2 vUv;
         uniform float uTime;
         void main() {
-          float angle = atan(vLocalPosition.y, vLocalPosition.x);
+          vec2 p = (vUv - 0.5) * 2.0;
+          float radius = length(p);
+          float angle = atan(p.y, p.x);
+          float radialDistortion = sin(angle * 3.0 + uTime * 0.16) * 0.0035
+            + sin(angle * 11.0 - uTime * 0.21) * 0.0018;
+          float warpedRadius = radius + radialDistortion;
+          float core = exp(-abs(warpedRadius - 0.925) * 235.0);
+          float closeGlow = exp(-abs(warpedRadius - 0.925) * 54.0);
+          float farGlow = exp(-abs(warpedRadius - 0.925) * 17.0);
           float facingLowerRight = max(0.0, cos(angle + 0.76));
-          float shoulder = pow(facingLowerRight, 3.0);
-          float whiteHot = pow(facingLowerRight, 17.0);
-          float pulse = 0.92 + sin(uTime * 0.5) * 0.08;
-          vec3 ember = vec3(1.0, 0.08, 0.035);
-          vec3 white = vec3(1.34, 1.25, 1.17);
+          float shoulder = pow(facingLowerRight, 3.4);
+          float whiteHot = pow(facingLowerRight, 15.0);
+          float pulse = 0.94 + sin(uTime * 0.43) * 0.06;
+          vec3 ember = vec3(0.72, 0.018, 0.009);
+          vec3 white = vec3(1.36, 1.31, 1.25);
           vec3 color = mix(ember, white, whiteHot);
-          float alpha = 0.085 + shoulder * 0.34 + whiteHot * 1.12 * pulse;
+          float baseLight = core * (0.025 + shoulder * 0.3 + whiteHot * 1.35);
+          float bloom = closeGlow * (0.006 + shoulder * 0.16 + whiteHot * 0.48)
+            + farGlow * whiteHot * 0.11;
+          float alpha = (baseLight + bloom) * pulse;
+          if (alpha < 0.002) discard;
           gl_FragColor = vec4(color, alpha);
-        }
-      `,
-    });
-    const haloGlowMaterial = new THREE.ShaderMaterial({
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      depthTest: true,
-      uniforms: { uTime: { value: 0 } },
-      vertexShader: /* glsl */ `
-        varying vec3 vLocalPosition;
-        void main() {
-          vLocalPosition = position;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        precision highp float;
-        varying vec3 vLocalPosition;
-        uniform float uTime;
-        void main() {
-          float angle = atan(vLocalPosition.y, vLocalPosition.x);
-          float focus = pow(max(0.0, cos(angle + 0.76)), 4.0);
-          float pulse = 0.82 + sin(uTime * 0.42) * 0.18;
-          gl_FragColor = vec4(1.0, 0.035, 0.012, (0.02 + focus * 0.24) * pulse);
         }
       `,
     });
@@ -310,20 +311,20 @@ export default function Home() {
       clearcoatRoughness: 0.2,
       flatShading: true,
     });
-    const pyramidGeometry = new THREE.ConeGeometry(11.3, 17.2, 4, 1, false, Math.PI / 4);
+    const pyramidGeometry = new THREE.ConeGeometry(11.3, 17.2, 4, 1, false, 0);
     const pyramidPositions = pyramidGeometry.attributes.position as THREE.BufferAttribute;
     for (let index = 0; index < pyramidPositions.count; index += 1) {
       const originalY = pyramidPositions.getY(index);
       const topWeight = THREE.MathUtils.clamp((8.6 - originalY) / 17.2, 0, 1);
-      pyramidPositions.setX(index, pyramidPositions.getX(index) * (1 + topWeight * 0.28));
+      pyramidPositions.setX(index, pyramidPositions.getX(index) * (1 + topWeight * 0.38));
       pyramidPositions.setZ(index, pyramidPositions.getZ(index) * (1 + topWeight * 0.11));
     }
     pyramidGeometry.computeVertexNormals();
     const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
     pyramid.position.set(0, 4.05, -6.15);
     pyramid.rotation.z = Math.PI;
-    pyramid.rotation.y = 0.14;
-    pyramid.rotation.x = -0.025;
+    pyramid.rotation.y = 0.035;
+    pyramid.rotation.x = -0.018;
     pyramid.castShadow = !compact;
     pyramid.receiveShadow = !compact;
     architecture.add(pyramid);
@@ -356,26 +357,10 @@ export default function Home() {
     eclipseDisc.position.set(0, 0.45, -6.82);
     eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.075, 10, 224), haloMaterial);
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(6.5, 224), haloMaterial);
     halo.position.set(0, 0.45, -6.7);
     halo.renderOrder = 2;
     architecture.add(halo);
-    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.36, 12, 224), haloGlowMaterial);
-    haloGlow.position.set(0, 0.45, -6.76);
-    haloGlow.renderOrder = 1;
-    architecture.add(haloGlow);
-
-    const lensHighlightMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf7fff9,
-      transparent: true,
-      opacity: 0.88,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const lensHighlight = new THREE.Mesh(new THREE.SphereGeometry(0.16, 20, 20), lensHighlightMaterial);
-    lensHighlight.position.set(4.27, -3.77, -6.58);
-    lensHighlight.renderOrder = 3;
-    architecture.add(lensHighlight);
 
     const ambientLight = new THREE.HemisphereLight(0x7b8b86, 0x030505, 1.04);
     scene.add(ambientLight);
@@ -398,7 +383,7 @@ export default function Home() {
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
 
-    const redFaceLight = new THREE.DirectionalLight(0xff3025, 3.05);
+    const redFaceLight = new THREE.DirectionalLight(0xff3025, 8.2);
     redFaceLight.position.set(10, 2.2, 7);
     redFaceLight.target.position.set(-1.4, 1.2, -6.15);
     scene.add(redFaceLight, redFaceLight.target);
@@ -493,9 +478,7 @@ export default function Home() {
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
-      haloGlowMaterial.uniforms.uTime.value = elapsed;
-      lensHighlightMaterial.opacity = 0.76 + Math.sin(elapsed * 0.5) * 0.12;
-      redFaceLight.intensity = 2.9 + Math.sin(elapsed * 0.29) * 0.24;
+      redFaceLight.intensity = 7.7 + Math.sin(elapsed * 0.29) * 0.48;
 
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
@@ -514,8 +497,6 @@ export default function Home() {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
       haloMaterial.dispose();
-      haloGlowMaterial.dispose();
-      lensHighlightMaterial.dispose();
       eclipseMaterial.dispose();
       pyramidMaterial.dispose();
       pyramidEdges.geometry.dispose();
