@@ -1,171 +1,336 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-const vertexShader = /* glsl */ `
+const nameVertexShader = /* glsl */ `
   attribute float aSeed;
   uniform float uTime;
-  uniform float uScroll;
-  uniform float uPulse;
   uniform vec2 uPointer;
-  uniform float uPointerActive;
+  uniform float uPulse;
   varying float vSeed;
-  varying float vGlow;
-  varying float vDepth;
+  varying float vEnergy;
 
   void main() {
     vec3 p = position;
-    float slowTime = uTime * 0.14;
-
-    p.y += sin(p.x * 0.72 + slowTime + aSeed * 8.0) * 0.055;
-    p.z += cos(p.y * 0.9 - slowTime * 1.4 + aSeed * 5.0) * 0.07;
-
-    float scrollWave = sin(p.x * 0.42 + aSeed * 12.0) * uScroll;
-    p.y += scrollWave * 0.55;
-    p.x += cos(p.z * 0.8 + aSeed * 9.0) * uScroll * 0.16;
-
-    vec2 particleScreen = vec2(p.x / 8.5, p.y / 4.5);
-    vec2 delta = particleScreen - uPointer;
-    float distanceToPointer = length(delta);
-    float influence = exp(-distanceToPointer * 5.5) * uPointerActive;
+    vec2 normalizedText = vec2(p.x / 6.4, p.y / 1.45);
+    vec2 delta = normalizedText - uPointer;
+    float pointerDistance = length(delta);
+    float influence = exp(-pointerDistance * 5.8);
     vec2 direction = normalize(delta + vec2(0.0001));
-    p.xy += direction * influence * (0.34 + uPulse * 0.5);
-    p.z += influence * (0.7 + sin(uTime * 2.0 + aSeed * 10.0) * 0.2);
 
-    float pulseRing = exp(-abs(distanceToPointer - uPulse * 0.55) * 9.0) * uPulse;
-    p.z += pulseRing * 0.8;
+    p.xy += direction * influence * (0.1 + aSeed * 0.065);
+    p.z += influence * (0.32 + aSeed * 0.16);
+    p.z += sin(uTime * 0.65 + aSeed * 28.0) * 0.015;
 
-    vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mvPosition;
-    gl_PointSize = (1.45 + aSeed * 1.9 + influence * 2.2 + pulseRing * 2.8) * (7.0 / -mvPosition.z);
+    float ring = exp(-abs(pointerDistance - uPulse * 0.7) * 11.0) * uPulse;
+    p.xy += direction * ring * 0.33;
+    p.z += ring * 0.75;
+
+    vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
+    gl_Position = projectionMatrix * viewPosition;
+    gl_PointSize = (0.86 + aSeed * 0.9 + influence * 1.9 + ring * 1.8) * (21.0 / -viewPosition.z);
 
     vSeed = aSeed;
-    vGlow = influence + pulseRing;
-    vDepth = smoothstep(13.0, 2.0, -mvPosition.z);
+    vEnergy = influence + ring;
   }
 `;
 
-const fragmentShader = /* glsl */ `
+const nameFragmentShader = /* glsl */ `
   precision highp float;
   varying float vSeed;
-  varying float vGlow;
-  varying float vDepth;
+  varying float vEnergy;
 
   void main() {
-    vec2 uv = gl_PointCoord - 0.5;
-    float distanceFromCenter = length(uv);
-    float particle = 1.0 - smoothstep(0.08, 0.5, distanceFromCenter);
-    float hot = step(0.925, vSeed);
-    vec3 cold = vec3(0.67, 0.72, 0.70);
-    vec3 warning = vec3(0.94, 0.075, 0.055);
-    vec3 color = mix(cold, warning, max(hot, vGlow * 0.78));
-    float alpha = particle * (0.28 + hot * 0.48 + vGlow * 0.52) * vDepth;
-    if (alpha < 0.015) discard;
+    vec2 point = gl_PointCoord - 0.5;
+    float circle = 1.0 - smoothstep(0.12, 0.5, length(point));
+    float redParticle = step(0.962, vSeed);
+    vec3 bone = vec3(1.22, 1.28, 1.24);
+    vec3 red = vec3(1.0, 0.09, 0.045);
+    vec3 color = mix(bone, red, max(redParticle, vEnergy * 0.55));
+    float alpha = circle * (0.72 + redParticle * 0.24 + vEnergy * 0.24);
+    if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
   }
 `;
 
-const sections = ["index", "experience", "projects", "contact"] as const;
+const navItems = ["experience", "projects", "contact"] as const;
+
+function createConcreteTexture() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 128;
+  canvas.height = 128;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  const image = context.createImageData(canvas.width, canvas.height);
+  for (let i = 0; i < image.data.length; i += 4) {
+    const value = 118 + Math.random() * 56;
+    image.data[i] = value;
+    image.data[i + 1] = value + 2;
+    image.data[i + 2] = value + 1;
+    image.data[i + 3] = 255;
+  }
+  context.putImageData(image, 0, 0);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(5, 5);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function createNameGeometry(label: string) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1800;
+  canvas.height = 420;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const geometry = new THREE.BufferGeometry();
+  if (!context) return geometry;
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#ffffff";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  let fontSize = 242;
+  context.font = `760 ${fontSize}px Arial, Helvetica, sans-serif`;
+  while (context.measureText(label).width > canvas.width * 0.86 && fontSize > 120) {
+    fontSize -= 4;
+    context.font = `760 ${fontSize}px Arial, Helvetica, sans-serif`;
+  }
+  context.fillText(label, canvas.width / 2, canvas.height / 2 + 8);
+
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const positions: number[] = [];
+  const seeds: number[] = [];
+  const step = 3;
+
+  for (let y = 0; y < canvas.height; y += step) {
+    for (let x = 0; x < canvas.width; x += step) {
+      const alpha = pixels[(y * canvas.width + x) * 4 + 3];
+      if (alpha > 96 && Math.random() > 0.05) {
+        const jitter = step * 0.12;
+        positions.push(
+          ((x - canvas.width / 2 + (Math.random() - 0.5) * jitter) / canvas.width) * 12.7,
+          (-(y - canvas.height / 2 + (Math.random() - 0.5) * jitter) / canvas.height) * 2.95,
+          (Math.random() - 0.5) * 0.14,
+        );
+        seeds.push(Math.random());
+      }
+    }
+  }
+
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(seeds, 1));
+  geometry.computeBoundingSphere();
+  return geometry;
+}
 
 export default function Home() {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const shaderRef = useRef<THREE.ShaderMaterial | null>(null);
+  const sceneMountRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef(0);
   const pulseRef = useRef(0);
-  const [activeSection, setActiveSection] = useState("index");
-  const [signal, setSignal] = useState("PASSIVE");
+  const [activeSection, setActiveSection] = useState("experience");
 
   useEffect(() => {
-    const mount = mountRef.current;
+    const mount = sceneMountRef.current;
     if (!mount) return;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x070808, 0.09);
+    scene.background = new THREE.Color(0x121617);
+    scene.fog = new THREE.FogExp2(0x171b1b, 0.033);
 
-    const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 40);
-    camera.position.set(0, 0.15, 8.4);
+    const compact = window.innerWidth < 760;
+    const camera = new THREE.PerspectiveCamera(compact ? 54 : 44, 1, 0.1, 70);
+    camera.position.set(0, 0.55, compact ? 18.2 : 15.3);
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      alpha: true,
+      antialias: true,
+      alpha: false,
       powerPreference: "high-performance",
     });
-    renderer.setClearColor(0x070808, 1);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.68;
+    renderer.shadowMap.enabled = !compact;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
     mount.appendChild(renderer.domElement);
 
-    const isCompact = window.innerWidth < 768;
-    const count = isCompact ? 5200 : 9800;
-    const positions = new Float32Array(count * 3);
-    const seeds = new Float32Array(count);
+    const concreteTexture = createConcreteTexture();
+    const concrete = new THREE.MeshStandardMaterial({
+      color: 0x4a5050,
+      roughness: 0.96,
+      metalness: 0.02,
+      map: concreteTexture ?? undefined,
+      bumpMap: concreteTexture ?? undefined,
+      bumpScale: 0.065,
+    });
+    const darkConcrete = concrete.clone();
+    darkConcrete.color.setHex(0x272c2c);
+    darkConcrete.roughness = 1;
+    const floorMaterial = concrete.clone();
+    floorMaterial.color.setHex(0x303636);
+    floorMaterial.roughness = 0.8;
+    const blackMaterial = new THREE.MeshStandardMaterial({
+      color: 0x101313,
+      roughness: 0.88,
+      metalness: 0.16,
+    });
+    const redMaterial = new THREE.MeshStandardMaterial({
+      color: 0x3a0503,
+      emissive: 0xff160d,
+      emissiveIntensity: 1.8,
+      roughness: 0.5,
+    });
+    const portalMaterial = new THREE.MeshBasicMaterial({ color: 0x8c0b07 });
+    const redHazeMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff1b11,
+      transparent: true,
+      opacity: 0.09,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+    });
 
-    for (let i = 0; i < count; i += 1) {
-      const seed = Math.random();
-      const angle = Math.random() * Math.PI * 2;
-      const radius = Math.pow(Math.random(), 0.58) * 9.2;
-      let x = Math.cos(angle) * radius;
-      let z = Math.sin(angle) * radius * 0.52 - 0.8;
-      let y =
-        Math.sin(x * 0.76) * 0.22 +
-        Math.cos(z * 1.5) * 0.12 -
-        Math.abs(z) * 0.07 +
-        (Math.random() - 0.5) * 0.14;
+    const architecture = new THREE.Group();
+    scene.add(architecture);
+    const floatingBlocks: THREE.Mesh[] = [];
 
-      // A narrow, impossible vertical structure interrupts the landscape.
-      if (i < count * 0.115) {
-        const side = Math.random() > 0.5 ? 1 : -1;
-        x = side * (0.82 + Math.random() * 0.24) + (Math.random() - 0.5) * 0.08;
-        y = (Math.random() - 0.42) * 6.4;
-        z = (Math.random() - 0.5) * 0.38;
-      }
+    const addBlock = (
+      x: number,
+      y: number,
+      z: number,
+      width: number,
+      height: number,
+      depth: number,
+      material: THREE.Material = concrete,
+      rotationY = 0,
+    ) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), material);
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = rotationY;
+      mesh.castShadow = !compact;
+      mesh.receiveShadow = !compact;
+      architecture.add(mesh);
+      return mesh;
+    };
 
-      positions[i * 3] = x;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = z;
-      seeds[i] = seed;
+    // A deep, inhabited brutalist hall rather than a flat backdrop.
+    addBlock(0, 2.2, -13, 31, 17, 1.2, darkConcrete);
+    addBlock(0, -3.65, -1, 30, 0.9, 28, floorMaterial);
+    addBlock(-10.1, 1.3, -4.5, 3.4, 12, 12, darkConcrete, -0.08);
+    addBlock(10.1, 1.3, -4.5, 3.4, 12, 12, darkConcrete, 0.08);
+
+    // Monumental gateway framing the red anomaly.
+    addBlock(-3.95, 0.9, -8.1, 1.35, 9.6, 1.5, concrete);
+    addBlock(3.95, 0.9, -8.1, 1.35, 9.6, 1.5, concrete);
+    addBlock(0, 5.35, -8.1, 9.25, 1.25, 1.5, concrete);
+    addBlock(0, -3.25, -8.1, 9.25, 0.75, 2.4, blackMaterial);
+    addBlock(0, 0.9, -8.72, 6.5, 7.7, 0.12, portalMaterial);
+
+    // Suspended administrative volumes and a severe concrete balcony.
+    addBlock(0, 2.45, -4.8, 12.8, 0.58, 4.5, concrete);
+    addBlock(-5.7, 4.65, -5.2, 5.8, 2.45, 3.2, darkConcrete);
+    addBlock(5.85, 4.15, -5.9, 5.2, 3.25, 3.4, darkConcrete);
+    addBlock(-7.05, -0.45, -3.15, 2.2, 5.4, 3.4, concrete);
+    addBlock(7.2, -0.7, -2.45, 2.55, 5.1, 3.8, concrete);
+
+    // Repeated beams establish scale and perspective.
+    for (let i = 0; i < 6; i += 1) {
+      const z = 3.5 - i * 3.2;
+      addBlock(-8.5, 5.65, z, 0.72, 1.05, 5.7, concrete, -0.02);
+      addBlock(8.5, 5.65, z, 0.72, 1.05, 5.7, concrete, 0.02);
+      addBlock(0, 6.2, z, 18, 0.62, 0.9, darkConcrete);
     }
 
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute("aSeed", new THREE.BufferAttribute(seeds, 1));
+    // A few impossible floating blocks break the architectural logic.
+    const floatingData = [
+      [-2.6, 4.8, -2.5, 1.2, 1.1, 1.5],
+      [2.1, 5.6, -4.0, 1.65, 0.8, 1.1],
+      [5.2, 2.4, -5.0, 0.85, 1.7, 0.9],
+      [-4.9, 1.8, -6.0, 1.1, 0.75, 1.2],
+      [0.2, 4.4, -6.7, 0.75, 1.3, 0.8],
+    ];
+    floatingData.forEach(([x, y, z, width, height, depth], index) => {
+      const block = addBlock(x, y, z, width, height, depth, index === 1 ? redMaterial : concrete);
+      block.rotation.set(index * 0.17, index * 0.28, index * -0.09);
+      floatingBlocks.push(block);
+    });
 
-    const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
+    // Thin emissive ceiling panels create the hard, institutional top light.
+    const lightPanelMaterial = new THREE.MeshBasicMaterial({ color: 0xb9c7c5 });
+    for (const x of [-5.7, -1.9, 1.9, 5.7]) {
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 0.2), lightPanelMaterial);
+      panel.position.set(x, 5.82, 1.4);
+      panel.rotation.x = Math.PI / 2;
+      architecture.add(panel);
+    }
+
+    const redHaze = new THREE.Mesh(new THREE.BoxGeometry(6.1, 7.1, 5.2), redHazeMaterial);
+    redHaze.position.set(0, 0.8, -6.2);
+    architecture.add(redHaze);
+
+    const ambientLight = new THREE.HemisphereLight(0xb8cac8, 0x070909, 1.3);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.SpotLight(0xdde8e5, 900, 38, Math.PI * 0.28, 0.78, 1.45);
+    keyLight.position.set(-5, 9.5, 7.5);
+    keyLight.target.position.set(0, -1, -5);
+    keyLight.castShadow = !compact;
+    keyLight.shadow.mapSize.set(1024, 1024);
+    scene.add(keyLight, keyLight.target);
+
+    const redLight = new THREE.SpotLight(0xff2116, 680, 34, Math.PI * 0.32, 0.76, 1.2);
+    redLight.position.set(0, 4.7, -6.4);
+    redLight.target.position.set(0, -1.2, 1.5);
+    redLight.castShadow = !compact;
+    redLight.shadow.mapSize.set(1024, 1024);
+    scene.add(redLight, redLight.target);
+
+    const sideLight = new THREE.DirectionalLight(0x9aafad, 1.5);
+    sideLight.position.set(7, 4, 8);
+    scene.add(sideLight);
+
+    // The name is a sampled type silhouette: every visible mark is a particle.
+    const nameGeometry = createNameGeometry("Siwei Yuan");
+    const nameMaterial = new THREE.ShaderMaterial({
+      vertexShader: nameVertexShader,
+      fragmentShader: nameFragmentShader,
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       uniforms: {
         uTime: { value: 0 },
-        uScroll: { value: 0 },
+        uPointer: { value: new THREE.Vector2(3, 3) },
         uPulse: { value: 0 },
-        uPointer: { value: new THREE.Vector2(4, 4) },
-        uPointerActive: { value: 0 },
       },
     });
-    shaderRef.current = material;
+    const namePoints = new THREE.Points(nameGeometry, nameMaterial);
+    namePoints.position.set(0, 0.1, 2.25);
+    namePoints.scale.setScalar(compact ? 0.72 : 1);
+    namePoints.renderOrder = 12;
+    scene.add(namePoints);
 
-    const points = new THREE.Points(geometry, material);
-    points.rotation.x = -0.08;
-    scene.add(points);
-
-    const pointerTarget = new THREE.Vector2(4, 4);
-    const pointerCurrent = new THREE.Vector2(4, 4);
-    let pointerActiveTarget = 0;
-
+    const targetPointer = new THREE.Vector2(0, 0);
+    const currentPointer = new THREE.Vector2(0, 0);
     const onPointerMove = (event: PointerEvent) => {
-      pointerTarget.set(
+      targetPointer.set(
         (event.clientX / window.innerWidth) * 2 - 1,
         -((event.clientY / window.innerHeight) * 2 - 1),
       );
-      pointerActiveTarget = 1;
     };
-
+    const onPointerDown = () => {
+      pulseRef.current = 1;
+    };
     const onPointerLeave = () => {
-      pointerActiveTarget = 0;
-      pointerTarget.set(4, 4);
+      targetPointer.set(0, 0);
     };
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener("pointerdown", onPointerDown, { passive: true });
+    document.documentElement.addEventListener("pointerleave", onPointerLeave);
 
     const resize = () => {
       const width = mount.clientWidth;
@@ -174,65 +339,76 @@ export default function Home() {
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
-
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    document.documentElement.addEventListener("pointerleave", onPointerLeave);
     window.addEventListener("resize", resize);
     resize();
 
-    const clock = new THREE.Clock();
-    let frame = 0;
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const startTime = performance.now();
+    let animationFrame = 0;
+    const animate = (timestamp: number) => {
+      const elapsed = reduceMotion ? 0 : (timestamp - startTime) / 1000;
+      currentPointer.lerp(targetPointer, reduceMotion ? 1 : 0.045);
 
-    const animate = () => {
-      const elapsed = clock.getElapsedTime();
-      pointerCurrent.lerp(pointerTarget, reduceMotion ? 1 : 0.075);
-      material.uniforms.uPointer.value.copy(pointerCurrent);
-      material.uniforms.uPointerActive.value = THREE.MathUtils.lerp(
-        material.uniforms.uPointerActive.value,
-        pointerActiveTarget,
-        0.08,
-      );
-      material.uniforms.uTime.value = reduceMotion ? 0 : elapsed;
-      material.uniforms.uScroll.value = THREE.MathUtils.lerp(
-        material.uniforms.uScroll.value,
-        scrollRef.current,
-        0.035,
-      );
-      pulseRef.current *= reduceMotion ? 0.75 : 0.94;
-      material.uniforms.uPulse.value = pulseRef.current;
+      const baseZ = compact ? 18.2 : 15.3;
+      camera.position.x = THREE.MathUtils.lerp(camera.position.x, currentPointer.x * 0.82, 0.045);
+      camera.position.y = THREE.MathUtils.lerp(camera.position.y, 0.55 + currentPointer.y * 0.48, 0.045);
+      camera.position.z = THREE.MathUtils.lerp(camera.position.z, baseZ + scrollRef.current * 2.4, 0.03);
+      camera.lookAt(currentPointer.x * -0.22, currentPointer.y * -0.12, -2.8);
 
-      if (!reduceMotion) {
-        points.rotation.z = Math.sin(elapsed * 0.055) * 0.025;
-        camera.position.x = Math.sin(elapsed * 0.075) * 0.12;
-      }
-      camera.lookAt(0, 0, 0);
+      architecture.rotation.y = THREE.MathUtils.lerp(architecture.rotation.y, currentPointer.x * -0.032, 0.04);
+      architecture.rotation.x = THREE.MathUtils.lerp(architecture.rotation.x, currentPointer.y * 0.014, 0.04);
+      architecture.position.x = THREE.MathUtils.lerp(architecture.position.x, currentPointer.x * -0.22, 0.04);
+
+      namePoints.rotation.y = THREE.MathUtils.lerp(namePoints.rotation.y, currentPointer.x * 0.035, 0.06);
+      namePoints.rotation.x = THREE.MathUtils.lerp(namePoints.rotation.x, currentPointer.y * -0.018, 0.06);
+      nameMaterial.uniforms.uTime.value = elapsed;
+      nameMaterial.uniforms.uPointer.value.copy(currentPointer);
+      pulseRef.current *= reduceMotion ? 0.7 : 0.935;
+      nameMaterial.uniforms.uPulse.value = pulseRef.current;
+
+      floatingBlocks.forEach((block, index) => {
+        block.position.y += Math.sin(elapsed * 0.34 + index * 1.7) * 0.0009;
+        block.rotation.y += reduceMotion ? 0 : 0.00025 * (index % 2 ? 1 : -1);
+      });
+      redHaze.material.opacity = 0.075 + Math.sin(elapsed * 0.52) * 0.018;
+
       renderer.render(scene, camera);
-      frame = requestAnimationFrame(animate);
+      animationFrame = requestAnimationFrame(animate);
     };
-    animate();
+    animationFrame = requestAnimationFrame(animate);
 
     return () => {
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(animationFrame);
       window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerdown", onPointerDown);
       document.documentElement.removeEventListener("pointerleave", onPointerLeave);
       window.removeEventListener("resize", resize);
-      geometry.dispose();
-      material.dispose();
+      nameGeometry.dispose();
+      nameMaterial.dispose();
+      architecture.traverse((object) => {
+        if (object instanceof THREE.Mesh) object.geometry.dispose();
+      });
+      concrete.dispose();
+      darkConcrete.dispose();
+      floorMaterial.dispose();
+      blackMaterial.dispose();
+      redMaterial.dispose();
+      portalMaterial.dispose();
+      redHazeMaterial.dispose();
+      lightPanelMaterial.dispose();
+      concreteTexture?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
-      shaderRef.current = null;
     };
   }, []);
 
   useEffect(() => {
     const updateScroll = () => {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = max > 0 ? window.scrollY / max : 0;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const progress = maxScroll > 0 ? window.scrollY / maxScroll : 0;
       scrollRef.current = progress;
       document.documentElement.style.setProperty("--scroll-progress", `${progress}`);
     };
-
     const observer = new IntersectionObserver(
       (entries) => {
         const visible = entries
@@ -240,106 +416,73 @@ export default function Home() {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible?.target.id) setActiveSection(visible.target.id);
       },
-      { rootMargin: "-30% 0px -45%", threshold: [0, 0.2, 0.55] },
+      { rootMargin: "-25% 0px -55%", threshold: [0, 0.25, 0.6] },
     );
-
-    sections.forEach((id) => {
-      const element = document.getElementById(id);
-      if (element) observer.observe(element);
+    navItems.forEach((id) => {
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
     });
     window.addEventListener("scroll", updateScroll, { passive: true });
     updateScroll();
-
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", updateScroll);
     };
   }, []);
 
-  const activateSignal = useCallback(() => {
-    pulseRef.current = 1;
-    setSignal("ACQUIRED");
-    window.setTimeout(() => setSignal("PASSIVE"), 1600);
-  }, []);
-
   return (
     <div className="site-shell">
-      <div ref={mountRef} className="particle-field" aria-hidden="true" />
-      <div className="noise" aria-hidden="true" />
+      <div ref={sceneMountRef} className="three-scene" aria-hidden="true" />
+      <div className="atmosphere" aria-hidden="true" />
+      <div className="film-grain" aria-hidden="true" />
       <div className="scroll-meter" aria-hidden="true" />
 
       <header className="topbar">
-        <a href="#index" className="brand" aria-label="Back to the top">
-          YSW<span>/PORTFOLIO</span>
+        <a className="brand" href="#index" aria-label="Back to Siwei Yuan home">
+          <i /> SIWEI YUAN <span>/ ARCHIVE</span>
         </a>
-        <nav className="primary-nav" aria-label="Main navigation">
-          {sections.map((section, index) => (
-            <a
-              key={section}
-              href={`#${section}`}
-              className={activeSection === section ? "active" : ""}
-            >
-              <span>0{index + 1}</span>
-              {section}
+        <nav aria-label="Main navigation">
+          {navItems.map((item, index) => (
+            <a key={item} href={`#${item}`} className={activeSection === item ? "active" : ""}>
+              <span>0{index + 1}</span>{item}
             </a>
           ))}
         </nav>
-        <div className="signal-status" aria-live="polite">
-          <i className={signal === "ACQUIRED" ? "live" : ""} />
-          SIGNAL {signal}
-        </div>
+        <p className="system-status"><i /> SCENE / LIVE</p>
       </header>
 
       <main>
-        <section id="index" className="hero section-panel" aria-labelledby="hero-name">
-          <div className="hero-meta meta-top">
-            <span>PORTER ID / YSW</span>
-            <span>31.2304° N / 121.4737° E</span>
+        <section id="index" className="hero" aria-labelledby="hero-name">
+          <h1 id="hero-name" className="sr-only">Siwei Yuan</h1>
+          <div className="hero-frame" aria-hidden="true" />
+          <div className="hero-label label-left">
+            <span>SUBJECT / 001</span>
+            <span>SIWEI YUAN</span>
           </div>
-
-          <div className="hero-center">
-            <p className="eyebrow">Independent creator · systems · artifacts</p>
-            <button
-              id="hero-name"
-              className="name-signal"
-              type="button"
-              onClick={activateSignal}
-              onPointerMove={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                event.currentTarget.style.setProperty(
-                  "--name-x",
-                  `${(event.clientX - rect.left) / rect.width - 0.5}`,
-                );
-                event.currentTarget.style.setProperty(
-                  "--name-y",
-                  `${(event.clientY - rect.top) / rect.height - 0.5}`,
-                );
-              }}
-              aria-label="YSW — activate signal"
-            >
-              <span className="name-ghost" aria-hidden="true">YSW</span>
-              <span className="name-main">YSW</span>
-            </button>
-            <p className="hero-note">
-              A quiet index of things built, observed, and carried across difficult terrain.
-            </p>
+          <div className="hero-label label-right">
+            <span>SHANGHAI</span>
+            <span>UTC +08:00</span>
           </div>
-
-          <div className="hero-meta meta-bottom">
-            <span>ARCHIVE STATUS / OPEN</span>
-            <a href="#experience">SCROLL TO DESCEND ↓</a>
+          <div className="interaction-note">
+            <i />
+            <span>MOVE TO SHIFT THE HOUSE</span>
+            <span>CLICK TO DISPERSE SIGNAL</span>
           </div>
+          <a className="scroll-cue" href="#experience">
+            <span>ENTER ARCHIVE</span>
+            <i />
+          </a>
         </section>
 
-        <section id="experience" className="content-section section-panel" aria-labelledby="experience-title">
-          <div className="section-index">
+        <section id="experience" className="content-section" aria-labelledby="experience-title">
+          <div className="section-rail">
             <span>01</span>
-            <p>RECORDED HISTORY</p>
+            <p>EXPERIENCE</p>
           </div>
-          <div className="section-content">
-            <p className="section-kicker">Experience / selected coordinates</p>
+          <div className="section-body">
+            <p className="section-kicker">Recorded history / selected coordinates</p>
             <h2 id="experience-title">Work done at the edge of the known map.</h2>
-            <div className="experience-list">
+            <div className="record-list">
               <article>
                 <span>2024—NOW</span>
                 <h3>Current Role</h3>
@@ -362,47 +505,39 @@ export default function Home() {
           </div>
         </section>
 
-        <section id="projects" className="content-section section-panel projects-section" aria-labelledby="projects-title">
-          <div className="section-index">
+        <section id="projects" className="content-section projects-section" aria-labelledby="projects-title">
+          <div className="section-rail">
             <span>02</span>
-            <p>FIELD OBJECTS</p>
+            <p>PROJECTS</p>
           </div>
-          <div className="section-content">
-            <p className="section-kicker">Projects / recovered artifacts</p>
+          <div className="section-body">
+            <p className="section-kicker">Recovered artifacts / field objects</p>
             <h2 id="projects-title">Signals worth leaving behind.</h2>
             <div className="project-grid">
               {["A", "B", "C"].map((letter, index) => (
-                <article className="project-card" key={letter}>
-                  <div className="project-visual" aria-hidden="true">
-                    <span>{letter}</span>
-                    <i />
-                  </div>
-                  <div className="project-copy">
-                    <span>PROJECT / 00{index + 1}</span>
-                    <h3>Untitled Artifact {letter}</h3>
-                    <p>Case study placeholder · context, intervention, consequence.</p>
-                  </div>
+                <article key={letter}>
+                  <div className="project-object" aria-hidden="true"><i /><b>{letter}</b></div>
+                  <span>PROJECT / 00{index + 1}</span>
+                  <h3>Untitled Artifact {letter}</h3>
+                  <p>Case study placeholder · context, intervention, consequence.</p>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        <section id="contact" className="contact-section section-panel" aria-labelledby="contact-title">
-          <div className="contact-frame">
+        <section id="contact" className="contact-section" aria-labelledby="contact-title">
+          <div className="contact-panel">
             <p className="section-kicker">Contact / establish a strand</p>
             <h2 id="contact-title">If the signal reaches you, answer.</h2>
-            <a className="contact-link" href="mailto:hello@your-domain.com">
-              hello@your-domain.com <span>↗</span>
-            </a>
-            <div className="contact-meta">
+            <a href="mailto:hello@your-domain.com">hello@your-domain.com <span>↗</span></a>
+            <div>
               <span>AVAILABLE FOR CONVERSATIONS</span>
-              <span>RESPONSE WINDOW / 48H</span>
               <span>SHANGHAI / UTC+8</span>
             </div>
           </div>
           <footer>
-            <span>© {new Date().getFullYear()} YSW</span>
+            <span>© {new Date().getFullYear()} SIWEI YUAN</span>
             <a href="#index">RETURN TO SURFACE ↑</a>
           </footer>
         </section>

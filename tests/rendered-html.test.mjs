@@ -22,8 +22,8 @@ test("server-renders the portfolio structure and metadata", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
-  assert.match(html, /<title>YSW — Selected Work<\/title>/i);
-  assert.match(html, /Independent creator/);
+  assert.match(html, /<title>Siwei Yuan — Selected Work<\/title>/i);
+  assert.match(html, /Siwei Yuan/);
   assert.match(html, /id="experience"/);
   assert.match(html, /id="projects"/);
   assert.match(html, /id="contact"/);
@@ -42,7 +42,7 @@ test("keeps the interactive visual local and removes starter artifacts", async (
   assert.match(page, /ShaderMaterial/);
   assert.match(page, /pointermove/);
   assert.match(page, /prefers-reduced-motion/);
-  assert.match(layout, /title: "YSW — Selected Work"/);
+  assert.match(layout, /title: "Siwei Yuan — Selected Work"/);
   assert.match(packageJson, /"three"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
