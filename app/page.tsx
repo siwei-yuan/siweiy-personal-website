@@ -342,6 +342,71 @@ export default function Home() {
     const architecture = new THREE.Group();
     scene.add(architecture);
 
+    const backgroundBoardMaterial = new THREE.ShaderMaterial({
+      depthWrite: true,
+      toneMapped: false,
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        void main() {
+          float centreLift = 1.0 - smoothstep(0.0, 0.72, distance(vUv, vec2(0.5, 0.48)));
+          float lowerShade = smoothstep(0.0, 0.46, vUv.y);
+          float centralJoint = exp(-pow((vUv.x - 0.5) / 0.0024, 2.0));
+          vec3 color = mix(vec3(0.022, 0.025, 0.025), vec3(0.078, 0.086, 0.086), centreLift);
+          color *= mix(0.7, 1.0, lowerShade);
+          color += vec3(0.018, 0.021, 0.021) * centralJoint * 0.24;
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+    });
+    const backgroundBoard = new THREE.Mesh(
+      new THREE.PlaneGeometry(34, 22),
+      backgroundBoardMaterial,
+    );
+    backgroundBoard.position.set(0, 1.6, -9.35);
+    architecture.add(backgroundBoard);
+
+    const floorMaterial = new THREE.ShaderMaterial({
+      depthWrite: true,
+      toneMapped: false,
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        void main() {
+          vec2 lightOffset = vUv - vec2(0.638, 0.812);
+          float redPool = exp(-(
+            pow(lightOffset.x / 0.075, 2.0) + pow(lightOffset.y / 0.115, 2.0)
+          ));
+          float sourceCore = exp(-(
+            pow(lightOffset.x / 0.026, 2.0) + pow(lightOffset.y / 0.046, 2.0)
+          ));
+          float floorDepth = mix(0.52, 1.0, smoothstep(0.12, 0.92, vUv.y));
+          vec3 floorColor = vec3(0.032, 0.035, 0.035) * floorDepth;
+          floorColor += vec3(0.19, 0.006, 0.003) * redPool;
+          floorColor += vec3(0.34, 0.012, 0.006) * sourceCore;
+          gl_FragColor = vec4(floorColor, 1.0);
+        }
+      `,
+    });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(34, 24), floorMaterial);
+    floor.position.set(0, -4.95, -1.0);
+    floor.rotation.x = -Math.PI / 2;
+    architecture.add(floor);
+
     // A hand-built three-face monolith: one uninterrupted front plane faces
     // the viewer, while two widened side wings create the reverse perspective.
     const frontVertices = [-10.1, 8.6, 0.55, 0, -8.6, 2.0, 10.1, 8.6, 0.55];
@@ -640,6 +705,8 @@ export default function Home() {
       });
       haloMaterial.dispose();
       eclipseMaterial.dispose();
+      backgroundBoardMaterial.dispose();
+      floorMaterial.dispose();
       pyramidFrontMaterial.dispose();
       pyramidLeftMaterial.dispose();
       pyramidRightMaterial.dispose();
@@ -711,26 +778,26 @@ export default function Home() {
             <p>EXPERIENCE</p>
           </div>
           <div className="section-body">
-            <p className="section-kicker">Recorded history / selected coordinates</p>
-            <h2 id="experience-title">Work done at the edge of the known map.</h2>
+            <p className="section-kicker">Personnel record / controlled access</p>
+            <h2 id="experience-title">Experience</h2>
             <div className="record-list">
               <article>
                 <span>2024—NOW</span>
                 <h3>Current Role</h3>
-                <p>Role, company, and a concise line about the territory you own.</p>
-                <em>DETAILS CLASSIFIED</em>
+                <p>Company / title / the system or territory under your control.</p>
+                <em>ACTIVE</em>
               </article>
               <article>
                 <span>2021—2024</span>
                 <h3>Previous Chapter</h3>
-                <p>A meaningful result, the system behind it, and the people it served.</p>
-                <em>ARCHIVE ENTRY 002</em>
+                <p>Company / title / one concrete intervention and its consequence.</p>
+                <em>SEALED / 02</em>
               </article>
               <article>
                 <span>2018—2021</span>
                 <h3>Origin Point</h3>
-                <p>The first signal: formative work, obsessions, and useful scars.</p>
-                <em>ARCHIVE ENTRY 001</em>
+                <p>Company / title / the formative work that established the trajectory.</p>
+                <em>SEALED / 01</em>
               </article>
             </div>
           </div>
@@ -742,15 +809,16 @@ export default function Home() {
             <p>PROJECTS</p>
           </div>
           <div className="section-body">
-            <p className="section-kicker">Recovered artifacts / field objects</p>
-            <h2 id="projects-title">Signals worth leaving behind.</h2>
+            <p className="section-kicker">Case files / selected operations</p>
+            <h2 id="projects-title">Projects</h2>
             <div className="project-grid">
               {["A", "B", "C"].map((letter, index) => (
                 <article key={letter}>
-                  <div className="project-object" aria-hidden="true"><i /><b>{letter}</b></div>
-                  <span>PROJECT / 00{index + 1}</span>
+                  <b className="project-number">0{index + 1}</b>
+                  <span>CASE / {letter}</span>
                   <h3>Untitled Artifact {letter}</h3>
-                  <p>Case study placeholder · context, intervention, consequence.</p>
+                  <p>Context / intervention / measurable consequence.</p>
+                  <em>FILE OPEN ↗</em>
                 </article>
               ))}
             </div>
@@ -763,14 +831,14 @@ export default function Home() {
             <p>BLOGS</p>
           </div>
           <div className="section-body">
-            <p className="section-kicker">Notes / transmissions</p>
-            <h2 id="blogs-title">Thoughts still finding their form.</h2>
+            <p className="section-kicker">Field notes / public transmission</p>
+            <h2 id="blogs-title">Blogs</h2>
             <div className="record-list">
               <article>
                 <span>COMING SOON</span>
                 <h3>First Transmission</h3>
-                <p>Writing about systems, design, technology, and the unfamiliar.</p>
-                <em>DRAFT / 001</em>
+                <p>Systems / design / technology / unfamiliar territory.</p>
+                <em>DRAFT / 01</em>
               </article>
             </div>
           </div>
