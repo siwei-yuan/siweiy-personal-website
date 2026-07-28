@@ -407,9 +407,9 @@ export default function Home() {
           float centreLift = 1.0 - smoothstep(0.0, 0.72, distance(vUv, vec2(0.5, 0.48)));
           float lowerShade = smoothstep(0.0, 0.46, vUv.y);
           float centralJoint = exp(-pow((vUv.x - 0.5) / 0.0024, 2.0));
-          vec3 color = mix(vec3(0.022, 0.025, 0.025), vec3(0.078, 0.086, 0.086), centreLift);
-          color *= mix(0.7, 1.0, lowerShade);
-          color += vec3(0.018, 0.021, 0.021) * centralJoint * 0.24;
+          vec3 color = mix(vec3(0.006, 0.008, 0.008), vec3(0.027, 0.032, 0.033), centreLift);
+          color *= mix(0.78, 1.0, lowerShade);
+          color += vec3(0.009, 0.012, 0.012) * centralJoint * 0.12;
           gl_FragColor = vec4(color, 1.0);
         }
       `,

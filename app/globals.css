@@ -68,6 +68,24 @@ body::selection { background: var(--red); color: #fff; }
     radial-gradient(circle at 50% 48%, transparent 8%, rgba(0,0,0,.1) 48%, rgba(0,0,0,.52) 100%);
 }
 
+.atmosphere::before {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: -8%;
+  height: 42%;
+  background: linear-gradient(
+    180deg,
+    #000 0%,
+    rgba(0,0,0,.97) 25%,
+    rgba(0,0,0,.82) 48%,
+    rgba(0,0,0,.34) 76%,
+    transparent 100%
+  );
+  filter: blur(18px);
+}
+
 .atmosphere::after {
   content: "";
   position: absolute;
