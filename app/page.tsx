@@ -52,7 +52,7 @@ const nameVertexShader = /* glsl */ `
 
     // Only a small subset crosses the lens. Most of the word remains anchored;
     // selected particles skim the rim, while a rarer group falls toward the core.
-    vec2 horizonSpace = position.xy / 1.46;
+    vec2 horizonSpace = position.xy / 3.6;
     float horizonRadius = length(horizonSpace);
     vec2 horizonDirection = normalize(horizonSpace + vec2(0.0001));
     vec2 horizonTangent = vec2(-horizonDirection.y, horizonDirection.x);
@@ -172,6 +172,7 @@ function createNameGeometry(label: string) {
 
 export default function Home() {
   const sceneMountRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef(0);
   const pulseRef = useRef(0);
   const [activeSection, setActiveSection] = useState("experience");
@@ -201,31 +202,6 @@ export default function Home() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
     mount.appendChild(renderer.domElement);
 
-    const groundMaterial = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      fog: false,
-    });
-    const groundGlowMaterial = new THREE.ShaderMaterial({
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      vertexShader: /* glsl */ `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: /* glsl */ `
-        precision highp float;
-        varying vec2 vUv;
-        void main() {
-          vec2 p = (vUv - 0.5) * vec2(2.0, 4.4);
-          float glow = exp(-dot(p, p) * 2.7);
-          gl_FragColor = vec4(1.0, 0.025, 0.008, glow * 0.34);
-        }
-      `,
-    });
     const haloMaterial = new THREE.ShaderMaterial({
       transparent: true,
       blending: THREE.AdditiveBlending,
@@ -325,28 +301,13 @@ export default function Home() {
     });
 
     const architecture = new THREE.Group();
-    const landscape = new THREE.Group();
     scene.add(architecture);
-    scene.add(landscape);
-
-    // Nothing remains in the world except a black receiving plane and its red spill.
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(90, 72), groundMaterial);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.set(0, -7.15, -10);
-    ground.receiveShadow = !compact;
-    landscape.add(ground);
-
-    const groundGlow = new THREE.Mesh(new THREE.PlaneGeometry(18, 24), groundGlowMaterial);
-    groundGlow.rotation.x = -Math.PI / 2;
-    groundGlow.position.set(0, -7.12, -4.6);
-    groundGlow.renderOrder = 8;
-    landscape.add(groundGlow);
 
     // Keep the monolith optically smooth: broad facets catch light, while the
     // silhouette stays unnaturally clean and slightly wider toward the viewer.
     const pyramidMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x172326,
-      roughness: 0.24,
+      color: 0x334347,
+      roughness: 0.34,
       metalness: 0.68,
       clearcoat: 0.38,
       clearcoatRoughness: 0.2,
@@ -382,16 +343,16 @@ export default function Home() {
 
     // The eclipse is physically behind the monolith. The opaque pyramid writes
     // depth first, masking the upper arc while the lower half escapes its tip.
-    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(2.28, 160), eclipseMaterial);
-    eclipseDisc.position.set(0, -4.55, -6.82);
+    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(5.88, 192), eclipseMaterial);
+    eclipseDisc.position.set(0, 1.0, -6.82);
     eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(2.34, 0.032, 8, 192), haloMaterial);
-    halo.position.set(0, -4.55, -6.7);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.045, 8, 224), haloMaterial);
+    halo.position.set(0, 1.0, -6.7);
     halo.renderOrder = 2;
     architecture.add(halo);
-    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(2.34, 0.24, 12, 192), haloGlowMaterial);
-    haloGlow.position.set(0, -4.55, -6.76);
+    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.36, 12, 224), haloGlowMaterial);
+    haloGlow.position.set(0, 1.0, -6.76);
     haloGlow.renderOrder = 1;
     architecture.add(haloGlow);
 
@@ -403,26 +364,11 @@ export default function Home() {
       depthWrite: false,
     });
     const lensHighlight = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), lensHighlightMaterial);
-    lensHighlight.position.set(1.68, -6.2, -6.58);
+    lensHighlight.position.set(4.27, -3.22, -6.58);
     lensHighlight.renderOrder = 3;
     architecture.add(lensHighlight);
 
-    const redAtmosphereMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff1b12,
-      transparent: true,
-      opacity: 0.035,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-    });
-    const redAtmosphere = new THREE.Mesh(
-      new THREE.ConeGeometry(4.8, 4.8, 48, 1, true),
-      redAtmosphereMaterial,
-    );
-    redAtmosphere.position.set(0, -5.05, -5.45);
-    architecture.add(redAtmosphere);
-
-    const ambientLight = new THREE.HemisphereLight(0x6f7e79, 0x030505, 0.84);
+    const ambientLight = new THREE.HemisphereLight(0x7b8b86, 0x030505, 1.04);
     scene.add(ambientLight);
 
     const keyLight = new THREE.DirectionalLight(0xd5ded9, 2.15);
@@ -435,13 +381,18 @@ export default function Home() {
     keyLight.shadow.camera.bottom = -10;
     scene.add(keyLight);
 
-    const coldFill = new THREE.DirectionalLight(0x718985, 0.68);
+    const coldFill = new THREE.DirectionalLight(0x718985, 0.9);
     coldFill.position.set(9, 3, -2);
     scene.add(coldFill);
 
-    const frontFill = new THREE.DirectionalLight(0xc1cfca, 0.82);
+    const frontFill = new THREE.DirectionalLight(0xc1cfca, 1.12);
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
+
+    const redFaceLight = new THREE.SpotLight(0xff2d21, 86, 48, Math.PI * 0.36, 0.9, 1.45);
+    redFaceLight.position.set(10, 0.5, 4);
+    redFaceLight.target.position.set(-1.4, 1.2, -6.15);
+    scene.add(redFaceLight, redFaceLight.target);
 
     const coldSurfaceLight = new THREE.SpotLight(0xc8dedf, 365, 45, Math.PI * 0.3, 0.82, 1.4);
     coldSurfaceLight.position.set(-9, 9.5, 10);
@@ -463,7 +414,7 @@ export default function Home() {
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
-    namePoints.position.set(0, -3.0, 2.75);
+    namePoints.position.set(0, 1.05, 2.75);
     namePoints.scale.setScalar(compact ? 0.96 : 1.15);
     namePoints.renderOrder = 12;
     scene.add(namePoints);
@@ -474,6 +425,11 @@ export default function Home() {
     let pointerActive = false;
     const onPointerMove = (event: PointerEvent) => {
       pointerActive = true;
+      if (cursorRef.current) {
+        cursorRef.current.style.left = `${event.clientX}px`;
+        cursorRef.current.style.top = `${event.clientY}px`;
+        cursorRef.current.style.opacity = "1";
+      }
       targetPointer.set(
         (event.clientX / window.innerWidth) * 2 - 1,
         -((event.clientY / window.innerHeight) * 2 - 1),
@@ -481,10 +437,13 @@ export default function Home() {
     };
     const onPointerDown = () => {
       pulseRef.current = 1;
+      cursorRef.current?.classList.add("is-pulsing");
+      window.setTimeout(() => cursorRef.current?.classList.remove("is-pulsing"), 360);
     };
     const onPointerLeave = () => {
       pointerActive = false;
       targetPointer.set(0, 0);
+      if (cursorRef.current) cursorRef.current.style.opacity = "0";
     };
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -516,9 +475,6 @@ export default function Home() {
       architecture.rotation.y = THREE.MathUtils.lerp(architecture.rotation.y, currentPointer.x * -0.042, 0.04);
       architecture.rotation.x = THREE.MathUtils.lerp(architecture.rotation.x, currentPointer.y * 0.012, 0.04);
       architecture.position.x = THREE.MathUtils.lerp(architecture.position.x, currentPointer.x * -0.28, 0.04);
-      landscape.position.x = THREE.MathUtils.lerp(landscape.position.x, currentPointer.x * -0.09, 0.025);
-      landscape.rotation.y = THREE.MathUtils.lerp(landscape.rotation.y, currentPointer.x * -0.008, 0.025);
-
       namePoints.rotation.y = THREE.MathUtils.lerp(namePoints.rotation.y, currentPointer.x * 0.035, 0.06);
       namePoints.rotation.x = THREE.MathUtils.lerp(namePoints.rotation.x, currentPointer.y * -0.018, 0.06);
       nameMaterial.uniforms.uTime.value = elapsed;
@@ -530,7 +486,7 @@ export default function Home() {
       haloMaterial.uniforms.uTime.value = elapsed;
       haloGlowMaterial.uniforms.uTime.value = elapsed;
       lensHighlightMaterial.opacity = 0.76 + Math.sin(elapsed * 0.5) * 0.12;
-      redAtmosphereMaterial.opacity = 0.021 + Math.sin(elapsed * 0.36) * 0.006;
+      redFaceLight.intensity = 78 + Math.sin(elapsed * 0.29) * 9;
 
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
@@ -548,11 +504,6 @@ export default function Home() {
       architecture.traverse((object) => {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
-      landscape.traverse((object) => {
-        if (object instanceof THREE.Mesh) object.geometry.dispose();
-      });
-      groundMaterial.dispose();
-      groundGlowMaterial.dispose();
       haloMaterial.dispose();
       haloGlowMaterial.dispose();
       lensHighlightMaterial.dispose();
@@ -560,7 +511,6 @@ export default function Home() {
       pyramidMaterial.dispose();
       pyramidEdges.geometry.dispose();
       edgeMaterial.dispose();
-      redAtmosphereMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
@@ -600,6 +550,7 @@ export default function Home() {
       <div className="atmosphere" aria-hidden="true" />
       <div className="film-grain" aria-hidden="true" />
       <div className="scroll-meter" aria-hidden="true" />
+      <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
 
       <header className="topbar">
         <a className="brand" href="#index" aria-label="Back to Siwei Yuan home">
