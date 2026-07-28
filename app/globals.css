@@ -184,13 +184,7 @@ body::selection { background: var(--red); color: #fff; }
   top: 0;
   height: 100svh;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(0,0,0,.06) 0%, rgba(0,0,0,.13) 15%, rgba(0,0,0,.76) 58%, rgba(0,0,0,.94) 100%),
-    radial-gradient(ellipse at 50% 9%, transparent 0 12%, rgba(0,0,0,.24) 42%, rgba(0,0,0,.68) 100%);
-}
-
-.dossier-section + .dossier-section .dossier-sticky {
-  border-top: 1px solid rgba(223,232,228,.08);
+  background: transparent;
 }
 
 .section-title-position {

@@ -415,7 +415,7 @@ export default function Home() {
       `,
     });
     const backgroundBoard = new THREE.Mesh(
-      new THREE.PlaneGeometry(34, 22),
+      new THREE.PlaneGeometry(80, 80),
       backgroundBoardMaterial,
     );
     backgroundBoard.position.set(0, 1.6, -9.35);
@@ -748,7 +748,7 @@ export default function Home() {
       );
       const monumentScale = THREE.MathUtils.lerp(1, compact ? 0.18 : 0.16, collapse);
       monument.scale.setScalar(monumentScale);
-      monument.position.y = THREE.MathUtils.lerp(0, compact ? 9.0 : 8.7, collapse);
+      monument.position.y = THREE.MathUtils.lerp(0, compact ? 11.7 : 11.2, collapse);
       monument.position.z = THREE.MathUtils.lerp(0, -4.4, collapse);
 
       camera.position.lerp(idleCameraTarget, reduceMotion ? 1 : 0.055);
