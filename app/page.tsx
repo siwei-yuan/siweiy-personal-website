@@ -45,10 +45,10 @@ const nameVertexShader = /* glsl */ `
       cos(position.x * 1.45 - uTime * 0.47 + sin(position.y * 1.8))
     );
     float driftEnergy = 0.5 + 0.5 * sin(uTime * 0.39 + aSeed * 17.0);
-    p.xy += vec2(randomWalkX, randomWalkY) * (0.045 + aSeed * 0.04);
-    p.xy += localField * (0.055 + driftEnergy * 0.045);
-    p.xy += seedDirection * sin(uTime * 0.22 + aSeed * 23.0) * 0.035;
-    p.z += (randomWalkX - randomWalkY) * 0.045 + localField.x * 0.065;
+    p.xy += vec2(randomWalkX, randomWalkY) * (0.027 + aSeed * 0.024);
+    p.xy += localField * (0.034 + driftEnergy * 0.027);
+    p.xy += seedDirection * sin(uTime * 0.22 + aSeed * 23.0) * 0.022;
+    p.z += (randomWalkX - randomWalkY) * 0.028 + localField.x * 0.04;
 
     // Only a small subset crosses the lens. Most of the word remains anchored;
     // selected particles skim the rim, while a rarer group falls toward the core.
@@ -74,7 +74,7 @@ const nameVertexShader = /* glsl */ `
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
     float glowParticle = step(0.974, aSeed);
-    gl_PointSize = (1.12 + aSeed * 0.86 + influence * 1.28 + ring * 1.62 + horizon * rimParticle * 0.5 + glowParticle * 2.4) * (24.0 / -viewPosition.z);
+    gl_PointSize = (1.08 + aSeed * 0.54 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.5) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring + horizon * rimParticle * 0.46 + innerBand * fallingParticle * 0.5;
@@ -97,15 +97,12 @@ const nameFragmentShader = /* glsl */ `
     float radius = length(point);
     float circle = 1.0 - smoothstep(0.12, 0.5, radius);
     float softGlow = 1.0 - smoothstep(0.02, 0.5, radius);
-    float redParticle = step(0.962, vSeed);
-    vec3 bone = vec3(1.22, 1.28, 1.24);
-    vec3 red = vec3(1.0, 0.09, 0.045);
-    vec3 spectral = mix(vec3(0.14, 0.58, 0.72), vec3(1.0, 0.12, 0.055), step(0.5, vSeed));
-    vec3 color = mix(bone, red, max(redParticle, vEnergy * 0.46));
-    color = mix(color, spectral, vLens * 0.48);
-    color += mix(vec3(0.34, 0.58, 0.52), vec3(1.0, 0.2, 0.08), step(0.54, vSeed)) * vGlow * 0.9;
-    float alpha = circle * (0.72 + redParticle * 0.24 + vEnergy * 0.2 + vDisperse * 0.16);
-    alpha += softGlow * vGlow * 0.56;
+    vec3 bone = vec3(1.16, 1.22, 1.2);
+    vec3 spectral = mix(vec3(0.18, 0.48, 0.58), vec3(0.66, 0.82, 0.88), step(0.52, vSeed));
+    vec3 color = mix(bone, spectral, vLens * 0.42);
+    color += vec3(1.28, 1.34, 1.3) * vGlow;
+    float alpha = circle * (0.7 + vEnergy * 0.16 + vDisperse * 0.12);
+    alpha += softGlow * vGlow * 0.62;
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
   }
@@ -223,12 +220,12 @@ export default function Home() {
           float angle = atan(vLocalPosition.y, vLocalPosition.x);
           float facingLowerRight = max(0.0, cos(angle + 0.76));
           float shoulder = pow(facingLowerRight, 3.0);
-          float whiteHot = pow(facingLowerRight, 14.0);
+          float whiteHot = pow(facingLowerRight, 17.0);
           float pulse = 0.92 + sin(uTime * 0.5) * 0.08;
           vec3 ember = vec3(1.0, 0.08, 0.035);
-          vec3 white = vec3(1.0, 0.94, 0.88);
+          vec3 white = vec3(1.34, 1.25, 1.17);
           vec3 color = mix(ember, white, whiteHot);
-          float alpha = 0.075 + shoulder * 0.26 + whiteHot * 0.7 * pulse;
+          float alpha = 0.085 + shoulder * 0.34 + whiteHot * 1.12 * pulse;
           gl_FragColor = vec4(color, alpha);
         }
       `,
@@ -254,7 +251,7 @@ export default function Home() {
           float angle = atan(vLocalPosition.y, vLocalPosition.x);
           float focus = pow(max(0.0, cos(angle + 0.76)), 4.0);
           float pulse = 0.82 + sin(uTime * 0.42) * 0.18;
-          gl_FragColor = vec4(1.0, 0.035, 0.012, (0.018 + focus * 0.17) * pulse);
+          gl_FragColor = vec4(1.0, 0.035, 0.012, (0.02 + focus * 0.24) * pulse);
         }
       `,
     });
@@ -341,18 +338,30 @@ export default function Home() {
     pyramidEdges.rotation.copy(pyramid.rotation);
     architecture.add(pyramidEdges);
 
+    const redEdgeMaterial = new THREE.LineBasicMaterial({
+      color: 0xff3529,
+      transparent: true,
+      opacity: 0.17,
+      blending: THREE.AdditiveBlending,
+    });
+    const pyramidRedEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pyramidGeometry, 20), redEdgeMaterial);
+    pyramidRedEdges.position.copy(pyramid.position);
+    pyramidRedEdges.rotation.copy(pyramid.rotation);
+    pyramidRedEdges.renderOrder = 2;
+    architecture.add(pyramidRedEdges);
+
     // The eclipse is physically behind the monolith. The opaque pyramid writes
     // depth first, masking the upper arc while the lower half escapes its tip.
     const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(5.88, 192), eclipseMaterial);
-    eclipseDisc.position.set(0, 1.0, -6.82);
+    eclipseDisc.position.set(0, 0.45, -6.82);
     eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.045, 8, 224), haloMaterial);
-    halo.position.set(0, 1.0, -6.7);
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.075, 10, 224), haloMaterial);
+    halo.position.set(0, 0.45, -6.7);
     halo.renderOrder = 2;
     architecture.add(halo);
     const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(6.0, 0.36, 12, 224), haloGlowMaterial);
-    haloGlow.position.set(0, 1.0, -6.76);
+    haloGlow.position.set(0, 0.45, -6.76);
     haloGlow.renderOrder = 1;
     architecture.add(haloGlow);
 
@@ -363,8 +372,8 @@ export default function Home() {
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-    const lensHighlight = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), lensHighlightMaterial);
-    lensHighlight.position.set(4.27, -3.22, -6.58);
+    const lensHighlight = new THREE.Mesh(new THREE.SphereGeometry(0.16, 20, 20), lensHighlightMaterial);
+    lensHighlight.position.set(4.27, -3.77, -6.58);
     lensHighlight.renderOrder = 3;
     architecture.add(lensHighlight);
 
@@ -381,7 +390,7 @@ export default function Home() {
     keyLight.shadow.camera.bottom = -10;
     scene.add(keyLight);
 
-    const coldFill = new THREE.DirectionalLight(0x718985, 0.9);
+    const coldFill = new THREE.DirectionalLight(0x718985, 0.6);
     coldFill.position.set(9, 3, -2);
     scene.add(coldFill);
 
@@ -389,8 +398,8 @@ export default function Home() {
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
 
-    const redFaceLight = new THREE.SpotLight(0xff2d21, 86, 48, Math.PI * 0.36, 0.9, 1.45);
-    redFaceLight.position.set(10, 0.5, 4);
+    const redFaceLight = new THREE.DirectionalLight(0xff3025, 3.05);
+    redFaceLight.position.set(10, 2.2, 7);
     redFaceLight.target.position.set(-1.4, 1.2, -6.15);
     scene.add(redFaceLight, redFaceLight.target);
 
@@ -486,7 +495,7 @@ export default function Home() {
       haloMaterial.uniforms.uTime.value = elapsed;
       haloGlowMaterial.uniforms.uTime.value = elapsed;
       lensHighlightMaterial.opacity = 0.76 + Math.sin(elapsed * 0.5) * 0.12;
-      redFaceLight.intensity = 78 + Math.sin(elapsed * 0.29) * 9;
+      redFaceLight.intensity = 2.9 + Math.sin(elapsed * 0.29) * 0.24;
 
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
@@ -511,6 +520,8 @@ export default function Home() {
       pyramidMaterial.dispose();
       pyramidEdges.geometry.dispose();
       edgeMaterial.dispose();
+      pyramidRedEdges.geometry.dispose();
+      redEdgeMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
     };
