@@ -451,6 +451,10 @@ export default function Home() {
         uLightPosition: { value: lightPosition },
         uRadius: { value: radius },
         uStrength: { value: strength },
+        uBounceColor: { value: new THREE.Color(0xdce8e6) },
+        uBouncePosition: { value: new THREE.Vector2(0, 0) },
+        uBounceRadius: { value: 1 },
+        uBounceStrength: { value: 0 },
       },
       vertexShader: /* glsl */ `
         varying vec3 vLocalPosition;
@@ -467,6 +471,10 @@ export default function Home() {
         uniform vec2 uLightPosition;
         uniform float uRadius;
         uniform float uStrength;
+        uniform vec3 uBounceColor;
+        uniform vec2 uBouncePosition;
+        uniform float uBounceRadius;
+        uniform float uBounceStrength;
         void main() {
           float lightDistance = distance(vLocalPosition.xy, uLightPosition);
           float localFalloff = exp(-pow(lightDistance / uRadius, 2.0));
@@ -477,16 +485,19 @@ export default function Home() {
           vec3 color = uBaseColor
             + uLightColor * (localFalloff * 0.24 + sourceCore * 0.18) * uStrength;
           color *= mix(0.38, 1.0, lowerFog) * surfaceVariation;
+          vec2 bounceOffset = vLocalPosition.xy - uBouncePosition;
+          float reflectedLight = exp(-dot(bounceOffset, bounceOffset) / pow(uBounceRadius, 2.0));
+          color += uBounceColor * reflectedLight * uBounceStrength;
           gl_FragColor = vec4(color, 1.0);
         }
       `,
     });
     const pyramidLeftMaterial = makePointLitFaceMaterial(
       0x081012,
-      0x82979b,
-      new THREE.Vector2(-8.55, 3.15),
-      2.32,
-      1.66,
+      0x8fa8ad,
+      new THREE.Vector2(-8.75, 3.35),
+      2.5,
+      1.92,
     );
     const pyramidFrontMaterial = makePointLitFaceMaterial(
       0x070a0b,
@@ -502,6 +513,9 @@ export default function Home() {
       3.55,
       0.62,
     );
+    pyramidRightMaterial.uniforms.uBouncePosition.value.set(4.85, -3.95);
+    pyramidRightMaterial.uniforms.uBounceRadius.value = 1.55;
+    pyramidRightMaterial.uniforms.uBounceStrength.value = 0.064;
     const pyramidGeometry = new THREE.BufferGeometry();
     pyramidGeometry.setAttribute(
       "position",
@@ -509,7 +523,7 @@ export default function Home() {
     );
     pyramidGeometry.computeVertexNormals();
     const pyramid = new THREE.Group();
-    pyramid.position.set(0, 4.05, -6.15);
+    pyramid.position.set(0, 4.4, -6.15);
     const pyramidFront = new THREE.Mesh(frontGeometry, pyramidFrontMaterial);
     const pyramidLeft = new THREE.Mesh(leftGeometry, pyramidLeftMaterial);
     const pyramidRight = new THREE.Mesh(rightGeometry, pyramidRightMaterial);
