@@ -301,30 +301,43 @@ export default function Home() {
     const architecture = new THREE.Group();
     scene.add(architecture);
 
-    // Keep the monolith optically smooth: broad facets catch light, while the
-    // silhouette stays unnaturally clean and slightly wider toward the viewer.
-    const pyramidMaterial = new THREE.MeshPhysicalMaterial({
-      color: 0x334347,
-      roughness: 0.34,
+    // A hand-built three-face monolith: one uninterrupted front plane faces
+    // the viewer, while two widened side wings create the reverse perspective.
+    const pyramidFrontMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0x202b2e,
+      roughness: 0.42,
       metalness: 0.68,
-      clearcoat: 0.38,
-      clearcoatRoughness: 0.2,
+      clearcoat: 0.28,
+      clearcoatRoughness: 0.28,
       flatShading: true,
     });
-    const pyramidGeometry = new THREE.ConeGeometry(11.3, 17.2, 4, 1, false, 0);
-    const pyramidPositions = pyramidGeometry.attributes.position as THREE.BufferAttribute;
-    for (let index = 0; index < pyramidPositions.count; index += 1) {
-      const originalY = pyramidPositions.getY(index);
-      const topWeight = THREE.MathUtils.clamp((8.6 - originalY) / 17.2, 0, 1);
-      pyramidPositions.setX(index, pyramidPositions.getX(index) * (1 + topWeight * 0.38));
-      pyramidPositions.setZ(index, pyramidPositions.getZ(index) * (1 + topWeight * 0.11));
-    }
+    const pyramidLeftMaterial = pyramidFrontMaterial.clone();
+    pyramidLeftMaterial.color.setHex(0x293a3f);
+    pyramidLeftMaterial.emissive.setHex(0x071014);
+    pyramidLeftMaterial.emissiveIntensity = 0.24;
+    const pyramidRightMaterial = pyramidFrontMaterial.clone();
+    pyramidRightMaterial.color.setHex(0x231719);
+    pyramidRightMaterial.emissive.setHex(0x290403);
+    pyramidRightMaterial.emissiveIntensity = 0.17;
+
+    const pyramidGeometry = new THREE.BufferGeometry();
+    pyramidGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
+      // Broad uninterrupted front face.
+      -10.1, 8.6, 0.55,   0, -8.6, 2.0,   10.1, 8.6, 0.55,
+      // Reverse-perspective left wing.
+      -13.25, 8.6, -0.85,  0, -8.6, 2.0,   -10.1, 8.6, 0.55,
+      // Reverse-perspective right wing.
+      10.1, 8.6, 0.55,    0, -8.6, 2.0,   13.25, 8.6, -0.85,
+    ], 3));
+    pyramidGeometry.addGroup(0, 3, 0);
+    pyramidGeometry.addGroup(3, 3, 1);
+    pyramidGeometry.addGroup(6, 3, 2);
     pyramidGeometry.computeVertexNormals();
-    const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
+    const pyramid = new THREE.Mesh(
+      pyramidGeometry,
+      [pyramidFrontMaterial, pyramidLeftMaterial, pyramidRightMaterial],
+    );
     pyramid.position.set(0, 4.05, -6.15);
-    pyramid.rotation.z = Math.PI;
-    pyramid.rotation.y = 0.035;
-    pyramid.rotation.x = -0.018;
     pyramid.castShadow = !compact;
     pyramid.receiveShadow = !compact;
     architecture.add(pyramid);
@@ -342,10 +355,14 @@ export default function Home() {
     const redEdgeMaterial = new THREE.LineBasicMaterial({
       color: 0xff3529,
       transparent: true,
-      opacity: 0.17,
+      opacity: 0.13,
       blending: THREE.AdditiveBlending,
     });
-    const pyramidRedEdges = new THREE.LineSegments(new THREE.EdgesGeometry(pyramidGeometry, 20), redEdgeMaterial);
+    const redEdgeGeometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(10.1, 8.6, 0.55), new THREE.Vector3(13.25, 8.6, -0.85),
+      new THREE.Vector3(13.25, 8.6, -0.85), new THREE.Vector3(0, -8.6, 2.0),
+    ]);
+    const pyramidRedEdges = new THREE.LineSegments(redEdgeGeometry, redEdgeMaterial);
     pyramidRedEdges.position.copy(pyramid.position);
     pyramidRedEdges.rotation.copy(pyramid.rotation);
     pyramidRedEdges.renderOrder = 2;
@@ -353,19 +370,19 @@ export default function Home() {
 
     // The eclipse is physically behind the monolith. The opaque pyramid writes
     // depth first, masking the upper arc while the lower half escapes its tip.
-    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(5.88, 192), eclipseMaterial);
-    eclipseDisc.position.set(0, 0.45, -6.82);
+    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(6.32, 192), eclipseMaterial);
+    eclipseDisc.position.set(0, 0.45, -8.62);
     eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.CircleGeometry(6.5, 224), haloMaterial);
-    halo.position.set(0, 0.45, -6.7);
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(6.98, 224), haloMaterial);
+    halo.position.set(0, 0.45, -8.5);
     halo.renderOrder = 2;
     architecture.add(halo);
 
-    const ambientLight = new THREE.HemisphereLight(0x7b8b86, 0x030505, 1.04);
+    const ambientLight = new THREE.HemisphereLight(0x687773, 0x020303, 0.72);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xd5ded9, 2.15);
+    const keyLight = new THREE.DirectionalLight(0x9eafb2, 1.45);
     keyLight.position.set(-8, 13, 8);
     keyLight.castShadow = !compact;
     keyLight.shadow.mapSize.set(1536, 1536);
@@ -375,22 +392,22 @@ export default function Home() {
     keyLight.shadow.camera.bottom = -10;
     scene.add(keyLight);
 
-    const coldFill = new THREE.DirectionalLight(0x718985, 0.6);
-    coldFill.position.set(9, 3, -2);
+    const coldFill = new THREE.DirectionalLight(0x738e96, 1.15);
+    coldFill.position.set(-10, 4, 5);
     scene.add(coldFill);
 
-    const frontFill = new THREE.DirectionalLight(0xc1cfca, 1.12);
+    const frontFill = new THREE.DirectionalLight(0xaab8b5, 0.72);
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
 
-    const redFaceLight = new THREE.DirectionalLight(0xff3025, 8.2);
+    const redFaceLight = new THREE.DirectionalLight(0xff2b20, 2.05);
     redFaceLight.position.set(10, 2.2, 7);
     redFaceLight.target.position.set(-1.4, 1.2, -6.15);
     scene.add(redFaceLight, redFaceLight.target);
 
-    const coldSurfaceLight = new THREE.SpotLight(0xc8dedf, 365, 45, Math.PI * 0.3, 0.82, 1.4);
-    coldSurfaceLight.position.set(-9, 9.5, 10);
-    coldSurfaceLight.target.position.set(0, 4.5, -6.1);
+    const coldSurfaceLight = new THREE.SpotLight(0xaec4ca, 180, 45, Math.PI * 0.42, 0.92, 1.5);
+    coldSurfaceLight.position.set(-10, 8, 9);
+    coldSurfaceLight.target.position.set(-4.5, 3.2, -6.1);
     scene.add(coldSurfaceLight, coldSurfaceLight.target);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
@@ -476,7 +493,7 @@ export default function Home() {
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
-      redFaceLight.intensity = 7.7 + Math.sin(elapsed * 0.29) * 0.48;
+      redFaceLight.intensity = 1.9 + Math.sin(elapsed * 0.29) * 0.17;
 
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
@@ -496,10 +513,12 @@ export default function Home() {
       });
       haloMaterial.dispose();
       eclipseMaterial.dispose();
-      pyramidMaterial.dispose();
+      pyramidFrontMaterial.dispose();
+      pyramidLeftMaterial.dispose();
+      pyramidRightMaterial.dispose();
       pyramidEdges.geometry.dispose();
       edgeMaterial.dispose();
-      pyramidRedEdges.geometry.dispose();
+      redEdgeGeometry.dispose();
       redEdgeMaterial.dispose();
       renderer.dispose();
       renderer.domElement.remove();
