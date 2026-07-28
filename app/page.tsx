@@ -10,10 +10,12 @@ const nameVertexShader = /* glsl */ `
   uniform float uPulse;
   varying float vSeed;
   varying float vEnergy;
+  varying float vLens;
+  varying float vDisperse;
 
   void main() {
     vec3 p = position;
-    vec2 normalizedText = vec2(p.x / 9.0, p.y / 2.0);
+    vec2 normalizedText = vec2(p.x / 10.0, p.y / 2.1);
     vec2 delta = normalizedText - uPointer;
     float pointerDistance = length(delta);
     float influence = 1.0 - smoothstep(0.04, 0.62, pointerDistance);
@@ -26,16 +28,52 @@ const nameVertexShader = /* glsl */ `
     p.z += influence * (0.56 + aSeed * 0.24);
     p.z += sin(uTime * 0.48 + aSeed * 28.0) * (0.012 + broadInfluence * 0.045);
 
+    // Every particle performs its own bounded random walk around its letter
+    // anchor. A shared curl field gives nearby particles correlated motion,
+    // so the cloud feels alive without ever losing the name as its attractor.
+    vec2 seedDirection = normalize(vec2(
+      sin(aSeed * 91.7 + 0.6),
+      cos(aSeed * 73.1 - 0.4)
+    ));
+    float randomWalkX = sin(uTime * (0.31 + aSeed * 0.61) + aSeed * 97.0)
+      + sin(uTime * (1.07 + aSeed * 0.27) + aSeed * 41.0) * 0.38;
+    float randomWalkY = cos(uTime * (0.28 + aSeed * 0.57) + aSeed * 83.0)
+      + sin(uTime * (0.93 + aSeed * 0.33) + aSeed * 59.0) * 0.36;
+    vec2 localField = vec2(
+      sin(position.y * 2.6 + uTime * 0.54 + sin(position.x * 0.72)),
+      cos(position.x * 1.45 - uTime * 0.47 + sin(position.y * 1.8))
+    );
+    float driftEnergy = 0.5 + 0.5 * sin(uTime * 0.39 + aSeed * 17.0);
+    p.xy += vec2(randomWalkX, randomWalkY) * (0.045 + aSeed * 0.04);
+    p.xy += localField * (0.055 + driftEnergy * 0.045);
+    p.xy += seedDirection * sin(uTime * 0.22 + aSeed * 23.0) * 0.035;
+    p.z += (randomWalkX - randomWalkY) * 0.045 + localField.x * 0.065;
+
+    // The eclipse behaves as an event horizon: particles bend along its edge,
+    // shear inside it, and flare as they cross the lower-right accretion zone.
+    vec2 horizonSpace = position.xy / 1.46;
+    float horizonRadius = length(horizonSpace);
+    vec2 horizonDirection = normalize(horizonSpace + vec2(0.0001));
+    vec2 horizonTangent = vec2(-horizonDirection.y, horizonDirection.x);
+    float horizon = exp(-abs(horizonRadius - 1.0) * 5.2);
+    float interiorLens = 1.0 - smoothstep(0.18, 1.45, horizonRadius);
+    float lensPulse = 0.72 + sin(uTime * 0.44 + aSeed * 8.0) * 0.28;
+    p.xy += horizonTangent * horizon * lensPulse * (0.5 + aSeed * 0.46);
+    p.xy += horizonDirection * interiorLens * sin(aSeed * 37.0 + uTime * 0.36) * 0.19;
+    p.z += horizon * (0.5 + aSeed * 0.62) + interiorLens * 0.18;
+
     float ring = exp(-abs(pointerDistance - uPulse * 0.7) * 11.0) * uPulse;
     p.xy += direction * ring * 0.33;
     p.z += ring * 0.75;
 
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
-    gl_PointSize = (1.05 + aSeed * 0.82 + influence * 1.28 + ring * 1.62) * (24.0 / -viewPosition.z);
+    gl_PointSize = (1.12 + aSeed * 0.86 + influence * 1.28 + ring * 1.62 + horizon * 0.72) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
-    vEnergy = influence + ring;
+    vEnergy = influence + ring + horizon * 0.52;
+    vLens = max(horizon, interiorLens * 0.45);
+    vDisperse = driftEnergy;
   }
 `;
 
@@ -43,6 +81,8 @@ const nameFragmentShader = /* glsl */ `
   precision highp float;
   varying float vSeed;
   varying float vEnergy;
+  varying float vLens;
+  varying float vDisperse;
 
   void main() {
     vec2 point = gl_PointCoord - 0.5;
@@ -50,8 +90,10 @@ const nameFragmentShader = /* glsl */ `
     float redParticle = step(0.962, vSeed);
     vec3 bone = vec3(1.22, 1.28, 1.24);
     vec3 red = vec3(1.0, 0.09, 0.045);
-    vec3 color = mix(bone, red, max(redParticle, vEnergy * 0.55));
-    float alpha = circle * (0.72 + redParticle * 0.24 + vEnergy * 0.24);
+    vec3 spectral = mix(vec3(0.14, 0.58, 0.72), vec3(1.0, 0.12, 0.055), step(0.5, vSeed));
+    vec3 color = mix(bone, red, max(redParticle, vEnergy * 0.46));
+    color = mix(color, spectral, vLens * 0.48);
+    float alpha = circle * (0.72 + redParticle * 0.24 + vEnergy * 0.2 + vDisperse * 0.16);
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
   }
@@ -94,16 +136,26 @@ function createNameGeometry(label: string) {
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#ffffff";
-  context.textAlign = "center";
+  context.textAlign = "left";
   context.textBaseline = "middle";
 
   let fontSize = 242;
-  context.font = `760 ${fontSize}px Arial, Helvetica, sans-serif`;
-  while (context.measureText(label).width > canvas.width * 0.86 && fontSize > 120) {
+  const fontFamily = '"Avenir Next Condensed", "DIN Condensed", "Arial Narrow", sans-serif';
+  const letterSpacing = 14;
+  const measureTrackedText = () => Array.from(label).reduce(
+    (width, character) => width + context.measureText(character).width + letterSpacing,
+    -letterSpacing,
+  );
+  context.font = `700 ${fontSize}px ${fontFamily}`;
+  while (measureTrackedText() > canvas.width * 0.92 && fontSize > 120) {
     fontSize -= 4;
-    context.font = `760 ${fontSize}px Arial, Helvetica, sans-serif`;
+    context.font = `700 ${fontSize}px ${fontFamily}`;
   }
-  context.fillText(label, canvas.width / 2, canvas.height / 2 + 8);
+  let penX = (canvas.width - measureTrackedText()) / 2;
+  for (const character of label) {
+    context.fillText(character, penX, canvas.height / 2 + 8);
+    penX += context.measureText(character).width + letterSpacing;
+  }
 
   const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
   const positions: number[] = [];
@@ -116,8 +168,8 @@ function createNameGeometry(label: string) {
       if (alpha > 96 && Math.random() > 0.07) {
         const jitter = step * 0.18;
         positions.push(
-          ((x - canvas.width / 2 + (Math.random() - 0.5) * jitter) / canvas.width) * 18.0,
-          (-(y - canvas.height / 2 + (Math.random() - 0.5) * jitter) / canvas.height) * 4.0,
+          ((x - canvas.width / 2 + (Math.random() - 0.5) * jitter) / canvas.width) * 20.0,
+          (-(y - canvas.height / 2 + (Math.random() - 0.5) * jitter) / canvas.height) * 4.2,
           (Math.random() - 0.5) * 0.14,
         );
         seeds.push(Math.random());
@@ -194,19 +246,61 @@ export default function Home() {
       opacity: 0.78,
       blending: THREE.AdditiveBlending,
     });
-    const haloMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffeee8,
+    const haloMaterial = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.94,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: true,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: /* glsl */ `
+        varying vec3 vLocalPosition;
+        void main() {
+          vLocalPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec3 vLocalPosition;
+        uniform float uTime;
+        void main() {
+          float angle = atan(vLocalPosition.y, vLocalPosition.x);
+          float facingLowerRight = max(0.0, cos(angle + 0.76));
+          float shoulder = pow(facingLowerRight, 3.0);
+          float whiteHot = pow(facingLowerRight, 14.0);
+          float pulse = 0.92 + sin(uTime * 0.5) * 0.08;
+          vec3 ember = vec3(1.0, 0.08, 0.035);
+          vec3 white = vec3(1.0, 0.94, 0.88);
+          vec3 color = mix(ember, white, whiteHot);
+          float alpha = 0.075 + shoulder * 0.26 + whiteHot * 0.7 * pulse;
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
     });
-    const haloGlowMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff130b,
+    const haloGlowMaterial = new THREE.ShaderMaterial({
       transparent: true,
-      opacity: 0.12,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      depthTest: true,
+      uniforms: { uTime: { value: 0 } },
+      vertexShader: /* glsl */ `
+        varying vec3 vLocalPosition;
+        void main() {
+          vLocalPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec3 vLocalPosition;
+        uniform float uTime;
+        void main() {
+          float angle = atan(vLocalPosition.y, vLocalPosition.x);
+          float focus = pow(max(0.0, cos(angle + 0.76)), 4.0);
+          float pulse = 0.82 + sin(uTime * 0.42) * 0.18;
+          gl_FragColor = vec4(1.0, 0.035, 0.012, (0.018 + focus * 0.17) * pulse);
+        }
+      `,
     });
     const eclipseMaterial = new THREE.ShaderMaterial({
       transparent: true,
@@ -361,13 +455,13 @@ export default function Home() {
       clearcoatRoughness: 0.2,
       flatShading: true,
     });
-    const pyramidGeometry = new THREE.ConeGeometry(9.4, 13.2, 4, 1, false, Math.PI / 4);
+    const pyramidGeometry = new THREE.ConeGeometry(11.3, 13.2, 4, 1, false, Math.PI / 4);
     const pyramidPositions = pyramidGeometry.attributes.position as THREE.BufferAttribute;
     for (let index = 0; index < pyramidPositions.count; index += 1) {
       const originalY = pyramidPositions.getY(index);
       const topWeight = THREE.MathUtils.clamp((6.6 - originalY) / 13.2, 0, 1);
-      pyramidPositions.setX(index, pyramidPositions.getX(index) * (1 + topWeight * 0.18));
-      pyramidPositions.setZ(index, pyramidPositions.getZ(index) * (1 + topWeight * 0.07));
+      pyramidPositions.setX(index, pyramidPositions.getX(index) * (1 + topWeight * 0.28));
+      pyramidPositions.setZ(index, pyramidPositions.getZ(index) * (1 + topWeight * 0.11));
     }
     pyramidGeometry.computeVertexNormals();
     const pyramid = new THREE.Mesh(pyramidGeometry, pyramidMaterial);
@@ -393,19 +487,19 @@ export default function Home() {
     addBlock(0, -2.96, -5.8, 9.4, 0.48, 6.6, darkConcrete);
     addBlock(0, -1.58, -5.05, 0.08, 2.25, 0.08, redSeamMaterial);
 
-    // The compact eclipse is pinned to the inverted tip and floats in front of
-    // the monolith so its warped interior remains visible behind the name.
+    // The eclipse is physically behind the monolith. The opaque pyramid writes
+    // depth first, masking the upper arc while the lower half escapes its tip.
     const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(2.28, 160), eclipseMaterial);
-    eclipseDisc.position.set(0, -0.3, -3.3);
-    eclipseDisc.renderOrder = 4;
+    eclipseDisc.position.set(0, -0.52, -6.82);
+    eclipseDisc.renderOrder = 1;
     architecture.add(eclipseDisc);
     const halo = new THREE.Mesh(new THREE.TorusGeometry(2.34, 0.032, 8, 192), haloMaterial);
-    halo.position.set(0, -0.3, -3.16);
-    halo.renderOrder = 5;
+    halo.position.set(0, -0.52, -6.7);
+    halo.renderOrder = 2;
     architecture.add(halo);
-    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(2.34, 0.15, 12, 192), haloGlowMaterial);
-    haloGlow.position.set(0, -0.3, -3.22);
-    haloGlow.renderOrder = 3;
+    const haloGlow = new THREE.Mesh(new THREE.TorusGeometry(2.34, 0.24, 12, 192), haloGlowMaterial);
+    haloGlow.position.set(0, -0.52, -6.76);
+    haloGlow.renderOrder = 1;
     architecture.add(haloGlow);
 
     const lensHighlightMaterial = new THREE.MeshBasicMaterial({
@@ -416,8 +510,8 @@ export default function Home() {
       depthWrite: false,
     });
     const lensHighlight = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 16), lensHighlightMaterial);
-    lensHighlight.position.set(2.34, -0.3, -3.04);
-    lensHighlight.renderOrder = 6;
+    lensHighlight.position.set(1.68, -2.17, -6.58);
+    lensHighlight.renderOrder = 3;
     architecture.add(lensHighlight);
 
     const redAtmosphereMaterial = new THREE.MeshBasicMaterial({
@@ -456,13 +550,13 @@ export default function Home() {
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
 
-    const redLight = new THREE.PointLight(0xff2418, 70, 19, 2);
-    redLight.position.set(0, -0.55, -4.25);
+    const redLight = new THREE.PointLight(0xff2418, 20, 16, 2);
+    redLight.position.set(4.0, -2.0, -1.2);
     scene.add(redLight);
 
-    const redUplight = new THREE.SpotLight(0xff2518, 245, 30, Math.PI * 0.17, 0.95, 1.55);
-    redUplight.position.set(0, -2.85, -2.2);
-    redUplight.target.position.set(0, 3.8, -6.15);
+    const redUplight = new THREE.SpotLight(0xff2518, 135, 27, Math.PI * 0.16, 0.96, 1.6);
+    redUplight.position.set(4.1, -2.85, -2.2);
+    redUplight.target.position.set(2.0, 0.4, -6.15);
     scene.add(redUplight, redUplight.target);
 
     const coldSurfaceLight = new THREE.SpotLight(0xc8dedf, 365, 45, Math.PI * 0.3, 0.82, 1.4);
@@ -471,7 +565,7 @@ export default function Home() {
     scene.add(coldSurfaceLight, coldSurfaceLight.target);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
-    const nameGeometry = createNameGeometry("Siwei Yuan");
+    const nameGeometry = createNameGeometry("SIWEI YUAN");
     const nameMaterial = new THREE.ShaderMaterial({
       vertexShader: nameVertexShader,
       fragmentShader: nameFragmentShader,
@@ -485,8 +579,8 @@ export default function Home() {
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
-    namePoints.position.set(0, 0.25, 2.75);
-    namePoints.scale.setScalar(compact ? 0.82 : 1.08);
+    namePoints.position.set(0, 0.32, 2.75);
+    namePoints.scale.setScalar(compact ? 0.96 : 1.15);
     namePoints.renderOrder = 12;
     scene.add(namePoints);
 
@@ -549,10 +643,11 @@ export default function Home() {
       nameMaterial.uniforms.uPulse.value = pulseRef.current;
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
-      haloGlow.material.opacity = 0.095 + Math.sin(elapsed * 0.42) * 0.025;
+      haloMaterial.uniforms.uTime.value = elapsed;
+      haloGlowMaterial.uniforms.uTime.value = elapsed;
       lensHighlightMaterial.opacity = 0.76 + Math.sin(elapsed * 0.5) * 0.12;
-      redLight.intensity = 66 + Math.sin(elapsed * 0.38) * 8;
-      redUplight.intensity = 235 + Math.sin(elapsed * 0.31) * 26;
+      redLight.intensity = 18 + Math.sin(elapsed * 0.38) * 3;
+      redUplight.intensity = 128 + Math.sin(elapsed * 0.31) * 15;
       redAtmosphereMaterial.opacity = 0.021 + Math.sin(elapsed * 0.36) * 0.006;
       skyMaterial.uniforms.uTime.value = elapsed;
 
