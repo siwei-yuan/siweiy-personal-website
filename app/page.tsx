@@ -242,16 +242,20 @@ export default function Home() {
           float core = exp(-abs(warpedRadius - 0.925) * 235.0);
           float closeGlow = exp(-abs(warpedRadius - 0.925) * 54.0);
           float farGlow = exp(-abs(warpedRadius - 0.925) * 17.0);
+          float scatterGlow = exp(-abs(warpedRadius - 0.925) * 8.5);
           float facingLowerRight = max(0.0, cos(angle + 0.76));
-          float shoulder = pow(facingLowerRight, 3.4);
-          float whiteHot = pow(facingLowerRight, 15.0);
+          float shoulder = pow(facingLowerRight, 2.15);
+          float whiteHot = pow(facingLowerRight, 7.25);
           float pulse = 0.94 + sin(uTime * 0.43) * 0.06;
-          vec3 ember = vec3(0.72, 0.018, 0.009);
-          vec3 white = vec3(1.36, 1.31, 1.25);
-          vec3 color = mix(ember, white, whiteHot);
-          float baseLight = core * (0.025 + shoulder * 0.3 + whiteHot * 1.35);
-          float bloom = closeGlow * (0.006 + shoulder * 0.16 + whiteHot * 0.48)
-            + farGlow * whiteHot * 0.11;
+          vec3 dimLine = vec3(0.46, 0.43, 0.41);
+          vec3 ember = vec3(0.78, 0.022, 0.01);
+          vec3 white = vec3(1.46, 1.4, 1.32);
+          vec3 color = mix(dimLine, ember, shoulder);
+          color = mix(color, white, whiteHot);
+          float baseLight = core * (0.068 + shoulder * 0.42 + whiteHot * 1.48);
+          float bloom = closeGlow * (0.011 + shoulder * 0.24 + whiteHot * 0.7)
+            + farGlow * (shoulder * 0.085 + whiteHot * 0.24)
+            + scatterGlow * whiteHot * 0.135;
           float alpha = (baseLight + bloom) * pulse;
           if (alpha < 0.002) discard;
           gl_FragColor = vec4(color, alpha);
