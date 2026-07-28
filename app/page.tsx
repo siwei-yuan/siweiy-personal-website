@@ -199,6 +199,8 @@ export default function Home() {
     const compact = window.innerWidth < 760;
     const camera = new THREE.PerspectiveCamera(compact ? 55 : 44, 1, 0.1, 90);
     camera.position.set(0, 1.8, compact ? 20.4 : 17.2);
+    camera.layers.enable(1);
+    camera.layers.enable(2);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -320,26 +322,37 @@ export default function Home() {
     pyramidRightMaterial.emissive.setHex(0x290403);
     pyramidRightMaterial.emissiveIntensity = 0.17;
 
+    const frontVertices = [-10.1, 8.6, 0.55, 0, -8.6, 2.0, 10.1, 8.6, 0.55];
+    const leftVertices = [-13.25, 8.6, -0.85, 0, -8.6, 2.0, -10.1, 8.6, 0.55];
+    const rightVertices = [10.1, 8.6, 0.55, 0, -8.6, 2.0, 13.25, 8.6, -0.85];
+    const makeFaceGeometry = (vertices: number[]) => {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+    const frontGeometry = makeFaceGeometry(frontVertices);
+    const leftGeometry = makeFaceGeometry(leftVertices);
+    const rightGeometry = makeFaceGeometry(rightVertices);
     const pyramidGeometry = new THREE.BufferGeometry();
-    pyramidGeometry.setAttribute("position", new THREE.Float32BufferAttribute([
-      // Broad uninterrupted front face.
-      -10.1, 8.6, 0.55,   0, -8.6, 2.0,   10.1, 8.6, 0.55,
-      // Reverse-perspective left wing.
-      -13.25, 8.6, -0.85,  0, -8.6, 2.0,   -10.1, 8.6, 0.55,
-      // Reverse-perspective right wing.
-      10.1, 8.6, 0.55,    0, -8.6, 2.0,   13.25, 8.6, -0.85,
-    ], 3));
-    pyramidGeometry.addGroup(0, 3, 0);
-    pyramidGeometry.addGroup(3, 3, 1);
-    pyramidGeometry.addGroup(6, 3, 2);
-    pyramidGeometry.computeVertexNormals();
-    const pyramid = new THREE.Mesh(
-      pyramidGeometry,
-      [pyramidFrontMaterial, pyramidLeftMaterial, pyramidRightMaterial],
+    pyramidGeometry.setAttribute(
+      "position",
+      new THREE.Float32BufferAttribute([...frontVertices, ...leftVertices, ...rightVertices], 3),
     );
+    pyramidGeometry.computeVertexNormals();
+    const pyramid = new THREE.Group();
     pyramid.position.set(0, 4.05, -6.15);
-    pyramid.castShadow = !compact;
-    pyramid.receiveShadow = !compact;
+    const pyramidFront = new THREE.Mesh(frontGeometry, pyramidFrontMaterial);
+    const pyramidLeft = new THREE.Mesh(leftGeometry, pyramidLeftMaterial);
+    const pyramidRight = new THREE.Mesh(rightGeometry, pyramidRightMaterial);
+    pyramidFront.layers.set(0);
+    pyramidLeft.layers.set(1);
+    pyramidRight.layers.set(2);
+    for (const face of [pyramidFront, pyramidLeft, pyramidRight]) {
+      face.castShadow = !compact;
+      face.receiveShadow = !compact;
+      pyramid.add(face);
+    }
     architecture.add(pyramid);
 
     const edgeMaterial = new THREE.LineBasicMaterial({
@@ -380,9 +393,11 @@ export default function Home() {
     architecture.add(halo);
 
     const ambientLight = new THREE.HemisphereLight(0x687773, 0x020303, 0.72);
+    ambientLight.layers.set(0);
     scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0x9eafb2, 1.45);
+    const keyLight = new THREE.DirectionalLight(0x9eafb2, 0.18);
+    keyLight.layers.set(0);
     keyLight.position.set(-8, 13, 8);
     keyLight.castShadow = !compact;
     keyLight.shadow.mapSize.set(1536, 1536);
@@ -393,19 +408,23 @@ export default function Home() {
     scene.add(keyLight);
 
     const coldFill = new THREE.DirectionalLight(0x738e96, 1.15);
+    coldFill.layers.set(1);
     coldFill.position.set(-10, 4, 5);
     scene.add(coldFill);
 
-    const frontFill = new THREE.DirectionalLight(0xaab8b5, 0.72);
+    const frontFill = new THREE.DirectionalLight(0xaab8b5, 0.12);
+    frontFill.layers.set(0);
     frontFill.position.set(2, 5, 12);
     scene.add(frontFill);
 
     const redFaceLight = new THREE.DirectionalLight(0xff2b20, 2.05);
+    redFaceLight.layers.set(2);
     redFaceLight.position.set(10, 2.2, 7);
     redFaceLight.target.position.set(-1.4, 1.2, -6.15);
     scene.add(redFaceLight, redFaceLight.target);
 
     const coldSurfaceLight = new THREE.SpotLight(0xaec4ca, 180, 45, Math.PI * 0.42, 0.92, 1.5);
+    coldSurfaceLight.layers.set(1);
     coldSurfaceLight.position.set(-10, 8, 9);
     coldSurfaceLight.target.position.set(-4.5, 3.2, -6.1);
     scene.add(coldSurfaceLight, coldSurfaceLight.target);
@@ -516,6 +535,7 @@ export default function Home() {
       pyramidFrontMaterial.dispose();
       pyramidLeftMaterial.dispose();
       pyramidRightMaterial.dispose();
+      pyramidGeometry.dispose();
       pyramidEdges.geometry.dispose();
       edgeMaterial.dispose();
       redEdgeGeometry.dispose();
