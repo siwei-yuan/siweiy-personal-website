@@ -360,7 +360,10 @@ body::selection { background: var(--red); color: #fff; }
   padding: 8px clamp(12px, 3vw, 48px) 18px;
 }
 
-.dossier-section[data-section="chronology"] .dossier-records { top: 30vh; }
+.dossier-section[data-section="chronology"] .dossier-records {
+  top: auto;
+  bottom: clamp(38px, 5vh, 56px);
+}
 
 .records-list.is-expanded {
   --timeline-card: clamp(172px, 15.5vw, 200px);
@@ -898,7 +901,12 @@ html {
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
   .dossier-records,
-  .dossier-section[data-section="chronology"] .dossier-records { top: 22vh; left: 16px; right: 16px; }
+  .dossier-section[data-section="chronology"] .dossier-records {
+    top: 22vh;
+    right: 16px;
+    bottom: auto;
+    left: 16px;
+  }
   .records-list {
     grid-template-columns: 1fr;
     gap: 34px;
