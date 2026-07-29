@@ -865,6 +865,65 @@ body::selection { background: var(--red); color: #fff; }
   background: var(--red);
 }
 
+.detail-project-shot {
+  position: relative;
+  align-self: flex-end;
+  width: 88%;
+  margin: 24px 5px 6px 0;
+  padding: 9px 9px 25px;
+  background: #eef0e8;
+  box-shadow:
+    5px 7px 0 rgba(57, 67, 66, .34),
+    11px 15px 24px rgba(15, 20, 20, .22);
+  transform: rotate(-1.25deg);
+  transform-origin: 64% 50%;
+}
+
+.detail-project-shot[data-orientation="portrait"] {
+  width: 46%;
+  margin-right: 9%;
+  transform: rotate(1.6deg);
+}
+
+.detail-project-shot::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  background:
+    linear-gradient(225deg, #c9d0ca 0 48%, rgba(51, 61, 60, .3) 50% 53%, #f7f8f1 55% 100%);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+  filter: drop-shadow(-2px 2px 1px rgba(0,0,0,.18));
+}
+
+.detail-project-shot > div {
+  width: 100%;
+  height: clamp(112px, 17vh, 150px);
+  border: 1px solid rgba(10, 14, 14, .28);
+  background-color: #111416;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  filter: saturate(.74) contrast(1.04);
+}
+
+.detail-project-shot[data-orientation="portrait"] > div {
+  height: clamp(150px, 23vh, 210px);
+  background-position: center top;
+}
+
+.detail-project-shot figcaption {
+  position: absolute;
+  left: 10px;
+  bottom: 7px;
+  color: rgba(8, 11, 11, .55);
+  font: 680 7px/1 var(--font-geist-mono), monospace;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
 .detail-project-link {
   display: inline-flex;
   align-items: center;
@@ -941,7 +1000,7 @@ body::selection { background: var(--red); color: #fff; }
 .social-link {
   position: relative;
   display: grid;
-  width: 78px;
+  width: clamp(136px, 13vw, 210px);
   aspect-ratio: 1;
   place-items: center;
   justify-self: center;
@@ -1137,7 +1196,7 @@ html {
   }
   .poster-detail-sheet h4 { font-size: clamp(2.1rem, 10vw, 3.6rem); }
   .social-links { width: 100vw; }
-  .social-link { width: 70px; }
+  .social-link { width: clamp(112px, 28vw, 140px); }
 }
 
 @media (prefers-reduced-motion: reduce) {

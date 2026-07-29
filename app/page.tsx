@@ -21,6 +21,7 @@ const nameVertexShader = /* glsl */ `
   uniform float uPulse;
   uniform float uExit;
   uniform float uFinale;
+  uniform float uAspect;
   varying float vSeed;
   varying float vEnergy;
   varying float vLens;
@@ -130,19 +131,17 @@ const nameVertexShader = /* glsl */ `
     finaleTarget.z += sin(uTime * 0.41 + aSeed * 61.0) * 0.025;
     p = mix(p, finaleTarget, finale);
 
-    // The cursor carries a broad red field. It affects a large, irregular
-    // portion of the nearby constellation rather than painting a uniform disc.
-    vec2 pointerColorSpace = mix(
-      vec2(p.x / 10.0, p.y / 3.0),
-      vec2(p.x / 4.8, p.y / 1.9),
-      finale
-    );
-    float colorDistance = length(pointerColorSpace - uPointer);
-    float colorField = 1.0 - smoothstep(0.08, 0.76, colorDistance);
-    float redVariation = fract(sin(aSeed * 613.73) * 1847.31);
-
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * viewPosition;
+    vec4 clipPosition = projectionMatrix * viewPosition;
+    gl_Position = clipPosition;
+    // Compare in projected screen space, not an estimated world-space ratio.
+    // Correcting X by the viewport aspect keeps the field circular in pixels.
+    vec2 screenPosition = clipPosition.xy / max(clipPosition.w, 0.0001);
+    vec2 colorDelta = screenPosition - uPointer;
+    colorDelta.x *= uAspect;
+    float colorDistance = length(colorDelta);
+    float colorField = 1.0 - smoothstep(0.04, 0.42, colorDistance);
+    float redVariation = fract(sin(aSeed * 613.73) * 1847.31);
     float glowParticle = step(0.925, aSeed);
     float glowPulse = glowParticle * (0.38 + 0.62 * (0.5 + 0.5 * sin(
       uTime * (0.72 + aSpeed * 1.25) + aSeed * 113.0
@@ -217,9 +216,10 @@ type PosterEntry = {
   summary?: string;
   highlights?: readonly string[];
   source?: string;
-  status?: string;
-  stack?: string;
   href?: string;
+  screenshot?: string;
+  screenshotAlt?: string;
+  screenshotOrientation?: "landscape" | "portrait";
 };
 
 type DossierSection = {
@@ -325,8 +325,6 @@ const dossierSections: readonly DossierSection[] = [
         title: "KeyTally",
         detail: "AI telemetry · QMK/VIA · macOS",
         company: "The tally light for your AI",
-        status: "Public · Open Source",
-        stack: "Tauri 2 · Rust · QMK",
         summary: "Turns AI usage, quota burn, and live activity into keyboard light.",
         highlights: [
           "Claude Code and Codex usage modes",
@@ -334,14 +332,15 @@ const dossierSections: readonly DossierSection[] = [
           "Pro QMK firmware with per-LED roles",
         ],
         href: "https://github.com/siwei-yuan/keytally",
+        screenshot: "https://raw.githubusercontent.com/siwei-yuan/keytally/main/docs/assets/ui-main.png",
+        screenshotAlt: "KeyTally usage telemetry interface with keyboard LED visualization",
+        screenshotOrientation: "landscape",
       },
       {
         marker: "OPEN SOURCE / 02",
         title: "Bili Pilot",
         detail: "CDN routing · DASH pre-cache · Chrome",
         company: "Stable high-bitrate Bilibili playback",
-        status: "Public · Experimental",
-        stack: "Chrome Extension · JavaScript · DASH",
         summary: "Compares signed CDN routes and pre-caches complete upcoming DASH segments.",
         highlights: [
           "Manual signed-route selection",
@@ -349,14 +348,15 @@ const dossierSections: readonly DossierSection[] = [
           "Local, private, and fail-open delivery",
         ],
         href: "https://github.com/siwei-yuan/bili-pilot",
+        screenshot: "https://raw.githubusercontent.com/siwei-yuan/bili-pilot/main/docs/images/bili-pilot-full-panel.png",
+        screenshotAlt: "Bili Pilot extension showing 4K routing and pre-cache status",
+        screenshotOrientation: "portrait",
       },
       {
         marker: "OPEN SOURCE / 03",
         title: "Aperture",
         detail: "Agent privacy · ReBAC · disclosure ledger",
         company: "Disclosure control for personal AI agents",
-        status: "Public · Open Source",
-        stack: "TypeScript · Memory Authorization · Ledger",
         summary: "Determines which resolution of a memory each person may access before model context is built.",
         highlights: [
           "Resolution-typed memory authorization",
@@ -1079,6 +1079,7 @@ export default function Home() {
         uFade: { value: 1 },
         uExit: { value: 0 },
         uFinale: { value: 0 },
+        uAspect: { value: 1 },
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
@@ -1133,6 +1134,7 @@ export default function Home() {
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      nameMaterial.uniforms.uAspect.value = width / Math.max(height, 1);
     };
     window.addEventListener("resize", resize);
     resize();
@@ -1411,13 +1413,11 @@ export default function Home() {
                 <div className="detail-sheet-body">
                   <p className="detail-company">{activePoster.company ?? "Selected record"}</p>
                   <h4>{activePoster.title}</h4>
-                  {(activePoster.period || activePoster.employment || activePoster.location || activePoster.status || activePoster.stack) && (
+                  {(activePoster.period || activePoster.employment || activePoster.location) && (
                     <dl>
                       {activePoster.period && <><dt>Period</dt><dd>{activePoster.period}</dd></>}
                       {activePoster.employment && <><dt>Type</dt><dd>{activePoster.employment}</dd></>}
                       {activePoster.location && <><dt>Location</dt><dd>{activePoster.location}</dd></>}
-                      {activePoster.status && <><dt>Status</dt><dd>{activePoster.status}</dd></>}
-                      {activePoster.stack && <><dt>System</dt><dd>{activePoster.stack}</dd></>}
                     </dl>
                   )}
                   <section>
@@ -1429,6 +1429,19 @@ export default function Home() {
                       </ul>
                     )}
                   </section>
+                  {activePoster.screenshot && (
+                    <figure
+                      className="detail-project-shot"
+                      data-orientation={activePoster.screenshotOrientation ?? "landscape"}
+                    >
+                      <div
+                        role="img"
+                        aria-label={activePoster.screenshotAlt ?? `${activePoster.title} product screenshot`}
+                        style={{ backgroundImage: `url("${activePoster.screenshot}")` }}
+                      />
+                      <figcaption>Field image / live interface</figcaption>
+                    </figure>
+                  )}
                   {activePoster.href && (
                     <a
                       className="detail-project-link"
