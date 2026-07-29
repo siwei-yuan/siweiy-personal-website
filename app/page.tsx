@@ -118,7 +118,7 @@ const nameVertexShader = /* glsl */ `
     float flarePulse = flareParticle * (0.62 + 0.38 * (0.5 + 0.5 * sin(
       uTime * (1.1 + aSpeed * 1.4) + aSeed * 151.0
     )));
-    gl_PointSize = (0.94 + aSize * 1.16 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.25 + flareParticle * 2.8) * (24.0 / -viewPosition.z);
+    gl_PointSize = (0.94 + aSize * 1.16 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.25) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring + horizon * rimParticle * 0.46 + innerBand * fallingParticle * 0.5;
