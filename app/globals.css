@@ -44,6 +44,20 @@ body::selection { background: var(--red); color: #fff; }
   isolation: isolate;
 }
 
+.site-shell > .three-scene,
+.site-shell > .atmosphere,
+.site-shell > .scroll-story {
+  filter: blur(0) brightness(1) saturate(1);
+  transition: filter 560ms cubic-bezier(.18,.76,.18,1);
+  will-change: filter;
+}
+
+.site-shell.poster-is-open > .three-scene,
+.site-shell.poster-is-open > .atmosphere,
+.site-shell.poster-is-open > .scroll-story {
+  filter: blur(18px) brightness(.48) saturate(.72);
+}
+
 .three-scene {
   position: fixed;
   inset: 0;
@@ -637,11 +651,7 @@ body::selection { background: var(--red); color: #fff; }
   display: grid;
   place-items: center;
   padding: 5vh 5vw;
-  background: rgba(0, 0, 0, .48);
-  -webkit-backdrop-filter: blur(18px) brightness(.48) saturate(.72);
-  backdrop-filter: blur(18px) brightness(.48) saturate(.72);
-  will-change: background-color, backdrop-filter;
-  animation: poster-backdrop-in 560ms cubic-bezier(.18,.76,.18,1) both;
+  background: transparent;
 }
 
 .poster-inspection {
@@ -834,19 +844,6 @@ body::selection { background: var(--red); color: #fff; }
 
 .poster-modal.is-closing .poster-detail-sheet {
   animation: detail-sheet-out 300ms cubic-bezier(.4, 0, 1, 1) both;
-}
-
-@keyframes poster-backdrop-in {
-  from {
-    background-color: rgba(0, 0, 0, 0);
-    -webkit-backdrop-filter: blur(0) brightness(1) saturate(1);
-    backdrop-filter: blur(0) brightness(1) saturate(1);
-  }
-  to {
-    background-color: rgba(0, 0, 0, .48);
-    -webkit-backdrop-filter: blur(18px) brightness(.48) saturate(.72);
-    backdrop-filter: blur(18px) brightness(.48) saturate(.72);
-  }
 }
 
 @keyframes detail-sheet-in {

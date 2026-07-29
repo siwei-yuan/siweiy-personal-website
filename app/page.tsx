@@ -1101,7 +1101,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="site-shell">
+    <div className={`site-shell${activePoster ? " poster-is-open" : ""}`}>
       <div ref={sceneMountRef} className="three-scene" aria-hidden="true" />
       <div className="atmosphere" aria-hidden="true" />
       <div ref={cursorLightRef} className="cursor-light-field" aria-hidden="true" />
