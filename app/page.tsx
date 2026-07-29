@@ -2,6 +2,7 @@
 
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -171,14 +172,88 @@ const nameFragmentShader = /* glsl */ `
   }
 `;
 
-const dossierSections = [
+type PosterEntry = {
+  marker: string;
+  title: string;
+  detail: string;
+  company?: string;
+  period?: string;
+  employment?: string;
+  location?: string;
+  summary?: string;
+  highlights?: readonly string[];
+  source?: string;
+};
+
+type DossierSection = {
+  id: string;
+  label: string;
+  entries: readonly PosterEntry[];
+};
+
+const dossierSections: readonly DossierSection[] = [
   {
     id: "experience",
     label: "Experience",
     entries: [
-      { marker: "2024—NOW", title: "Current Role", detail: "Company · title · territory under control." },
-      { marker: "2021—2024", title: "Previous Chapter", detail: "Intervention · consequence · recorded outcome." },
-      { marker: "2018—2021", title: "Origin Point", detail: "Formative work · systems · useful scars." },
+      {
+        marker: "MAY 2026—NOW",
+        title: "Member of Technical Staff",
+        detail: "Paperboy · Full-time",
+        company: "Paperboy",
+        period: "May 2026 — Present · 3 mos",
+        employment: "Full-time",
+        summary: "Building AI agents, platforms, and more...",
+        source: "LinkedIn profile",
+      },
+      {
+        marker: "JUL 2023—MAY 2026",
+        title: "Software Development Engineer",
+        detail: "Amazon Web Services · Full-time",
+        company: "Amazon Web Services (AWS)",
+        period: "Jul 2023 — May 2026 · 2 yrs 11 mos",
+        employment: "Full-time",
+        location: "Seattle, Washington, United States · On-site",
+        summary: "Worked on:",
+        highlights: [
+          "Windows on Graviton",
+          "KDNET extensibility module for Elastic Network Adapters",
+          "AWS Volume Shadow Copy Services (VSS)",
+          "Windows driver for Elastic Fabric Adapters",
+          "Windows experience on AWS",
+        ],
+        source: "LinkedIn profile",
+      },
+      {
+        marker: "JUN—SEP 2022",
+        title: "Software Development Engineer Intern",
+        detail: "Amazon Web Services · Internship",
+        company: "Amazon Web Services (AWS)",
+        period: "Jun 2022 — Sep 2022 · 4 mos",
+        employment: "Internship",
+        location: "Seattle, Washington, United States · On-site",
+        source: "LinkedIn profile",
+      },
+      {
+        marker: "JAN—SEP 2021",
+        title: "Software Engineer Intern",
+        detail: "Dell EMC · Internship",
+        company: "Dell EMC",
+        period: "Jan 2021 — Sep 2021 · 9 mos",
+        employment: "Internship",
+        location: "Shanghai, China",
+        source: "LinkedIn profile",
+      },
+      {
+        marker: "JUN—SEP 2020",
+        title: "Product Manager Intern",
+        detail: "Signify · Internship",
+        company: "Signify",
+        period: "Jun 2020 — Sep 2020 · 4 mos",
+        employment: "Internship",
+        location: "Shanghai, China",
+        source: "LinkedIn profile",
+      },
     ],
   },
   {
@@ -199,9 +274,7 @@ const dossierSections = [
       { marker: "NOTE / 03", title: "Observation", detail: "Methods for looking directly at strange systems." },
     ],
   },
-] as const;
-
-type PosterEntry = (typeof dossierSections)[number]["entries"][number];
+];
 type PosterMotion = { x: number; y: number; scale: number };
 
 function createNameGeometry(label: string) {
@@ -275,27 +348,26 @@ export default function Home() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorLightRef = useRef<HTMLDivElement>(null);
   const posterDialogRef = useRef<HTMLElement>(null);
+  const posterSourceRef = useRef<{ x: number; y: number; width: number } | null>(null);
   const posterCloseTimerRef = useRef<number | null>(null);
   const posterClosingRef = useRef(false);
   const pulseRef = useRef(0);
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
   const [posterMotion, setPosterMotion] = useState<PosterMotion>({ x: 0, y: 80, scale: 0.72 });
+  const [isPosterReady, setIsPosterReady] = useState(false);
   const [isPosterClosing, setIsPosterClosing] = useState(false);
 
   const openPoster = (entry: PosterEntry, source: HTMLElement) => {
     const bounds = source.getBoundingClientRect();
-    const compact = window.innerWidth <= 760;
-    const focusWidth = compact
-      ? Math.min(window.innerWidth * 0.86, 390)
-      : Math.min(window.innerWidth * 0.38, 480);
     if (posterCloseTimerRef.current !== null) window.clearTimeout(posterCloseTimerRef.current);
+    posterSourceRef.current = {
+      x: bounds.left + bounds.width / 2,
+      y: bounds.top + bounds.height / 2,
+      width: bounds.width,
+    };
     posterClosingRef.current = false;
+    setIsPosterReady(false);
     setIsPosterClosing(false);
-    setPosterMotion({
-      x: bounds.left + bounds.width / 2 - window.innerWidth / 2,
-      y: bounds.top + bounds.height / 2 - window.innerHeight / 2,
-      scale: Math.min(0.96, Math.max(0.32, bounds.width / focusWidth)),
-    });
     setActivePoster(entry);
   };
 
@@ -305,11 +377,25 @@ export default function Home() {
     setIsPosterClosing(true);
     posterCloseTimerRef.current = window.setTimeout(() => {
       setActivePoster(null);
+      setIsPosterReady(false);
       setIsPosterClosing(false);
       posterClosingRef.current = false;
       posterCloseTimerRef.current = null;
     }, 420);
   };
+
+  useLayoutEffect(() => {
+    if (!activePoster || !posterDialogRef.current || !posterSourceRef.current) return;
+    const bounds = posterDialogRef.current.getBoundingClientRect();
+    const source = posterSourceRef.current;
+    setPosterMotion({
+      x: source.x - (bounds.left + bounds.width / 2),
+      y: source.y - (bounds.top + bounds.height / 2),
+      scale: Math.min(0.96, Math.max(0.28, source.width / bounds.width)),
+    });
+    const readyFrame = window.requestAnimationFrame(() => setIsPosterReady(true));
+    return () => window.cancelAnimationFrame(readyFrame);
+  }, [activePoster]);
 
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
     const poster = event.currentTarget;
@@ -974,7 +1060,7 @@ export default function Home() {
               </header>
 
               <div className="dossier-records">
-                <div className="records-list">
+                <div className={`records-list${section.entries.length > 3 ? " is-expanded" : ""}`}>
                   {section.entries.map((entry) => (
                     <div className="poster-anchor" key={entry.title}>
                       <button
@@ -1000,30 +1086,63 @@ export default function Home() {
 
       {activePoster && (
         <div
-          className={`poster-modal${isPosterClosing ? " is-closing" : ""}`}
+          className={`poster-modal${isPosterReady ? " is-ready" : ""}${isPosterClosing ? " is-closing" : ""}`}
           onClick={(event) => {
             if (event.target === event.currentTarget) closeActivePoster();
           }}
         >
-          <article
-            ref={posterDialogRef}
-            className="poster-focus-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="poster-focus-title"
-            tabIndex={-1}
-            style={{
-              "--poster-origin-x": `${posterMotion.x}px`,
-              "--poster-origin-y": `${posterMotion.y}px`,
-              "--poster-origin-scale": posterMotion.scale,
-            } as CSSProperties}
-            onPointerMove={handlePosterMove}
-            onPointerLeave={resetPosterPose}
-          >
-            <span>{activePoster.marker}</span>
-            <h3 id="poster-focus-title">{activePoster.title}</h3>
-            <p>{activePoster.detail}</p>
-          </article>
+          <div className="poster-inspection">
+            <article
+              ref={posterDialogRef}
+              className="poster-focus-card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="poster-focus-title"
+              tabIndex={-1}
+              style={{
+                "--poster-origin-x": `${posterMotion.x}px`,
+                "--poster-origin-y": `${posterMotion.y}px`,
+                "--poster-origin-scale": posterMotion.scale,
+              } as CSSProperties}
+              onPointerMove={handlePosterMove}
+              onPointerLeave={resetPosterPose}
+            >
+              <span>{activePoster.marker}</span>
+              <h3 id="poster-focus-title">{activePoster.title}</h3>
+              <p>{activePoster.detail}</p>
+            </article>
+
+            {(activePoster.summary || activePoster.highlights?.length) && (
+              <aside className="poster-detail-sheet" aria-label={`${activePoster.title} details`}>
+                <header>
+                  <span>Experience record / extracted sheet</span>
+                  <b>{activePoster.marker}</b>
+                </header>
+                <div className="detail-sheet-body">
+                  <p className="detail-company">{activePoster.company ?? "Selected record"}</p>
+                  <h4>{activePoster.title}</h4>
+                  <dl>
+                    {activePoster.period && <><dt>Period</dt><dd>{activePoster.period}</dd></>}
+                    {activePoster.employment && <><dt>Type</dt><dd>{activePoster.employment}</dd></>}
+                    {activePoster.location && <><dt>Location</dt><dd>{activePoster.location}</dd></>}
+                  </dl>
+                  <section>
+                    <span>Field notes</span>
+                    <p>{activePoster.summary}</p>
+                    {activePoster.highlights && (
+                      <ul>
+                        {activePoster.highlights.map((highlight) => <li key={highlight}>{highlight}</li>)}
+                      </ul>
+                    )}
+                  </section>
+                </div>
+                <footer>
+                  <span>{activePoster.source ?? "Portfolio record"}</span>
+                  <span>Siwei Yuan / personnel archive</span>
+                </footer>
+              </aside>
+            )}
+          </div>
         </div>
       )}
     </div>

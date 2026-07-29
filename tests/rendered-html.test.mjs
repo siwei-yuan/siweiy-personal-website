@@ -27,7 +27,8 @@ test("server-renders the portfolio structure and metadata", async () => {
   assert.match(html, /id="experience"/);
   assert.match(html, /id="projects"/);
   assert.match(html, /id="blogs"/);
-  assert.match(html, /Current Role/);
+  assert.match(html, /Member of Technical Staff/);
+  assert.match(html, /Amazon Web Services/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
