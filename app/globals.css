@@ -747,7 +747,7 @@ body::selection { background: var(--red); color: #fff; }
   display: flex;
   flex-direction: column;
   width: min(44vw, 590px);
-  min-height: min(69vh, 650px);
+  height: fit-content;
   max-height: 88vh;
   margin-left: clamp(24px, 2.6vw, 42px);
   padding: clamp(28px, 2.5vw, 40px) clamp(28px, 2.5vw, 40px) clamp(28px, 2.5vw, 40px) clamp(22px, 1.8vw, 30px);
@@ -901,7 +901,6 @@ body::selection { background: var(--red); color: #fff; }
 .detail-project-shot > div {
   width: 100%;
   height: clamp(112px, 17vh, 150px);
-  border: 1px solid rgba(10, 14, 14, .28);
   background-color: #111416;
   background-position: center;
   background-repeat: no-repeat;
@@ -927,7 +926,6 @@ body::selection { background: var(--red); color: #fff; }
 .detail-project-link {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
   align-self: flex-start;
   margin-top: 28px;
   padding: 12px 15px 11px;
@@ -940,28 +938,12 @@ body::selection { background: var(--red); color: #fff; }
   transition: color 180ms ease, background 180ms ease, border-color 180ms ease;
 }
 
-.detail-project-link > span {
-  margin: 0;
-  color: inherit;
-  font: inherit;
-  letter-spacing: 0;
-}
-
 .detail-project-link:hover,
 .detail-project-link:focus-visible {
   outline: none;
   border-color: var(--red);
   background: var(--red);
   color: #fff;
-}
-
-.poster-card[data-linked="true"]::after {
-  content: "↗";
-  position: absolute;
-  right: 8%;
-  bottom: 6.4%;
-  color: rgba(4, 8, 8, .58);
-  font: 700 11px/1 var(--font-geist-mono), monospace;
 }
 
 .social-finale {

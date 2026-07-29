@@ -308,7 +308,7 @@ const dossierSections: readonly DossierSection[] = [
       {
         marker: "2019—2023",
         title: "UCLA",
-        detail: "GPA 3.97/4.00 · Summa Cum Laude · Bruin Space",
+        detail: "B.S. in Computer Engineering · GPA 3.97/4.00 · Summa Cum Laude",
         company: "University of California, Los Angeles",
         period: "2019 — 2023",
         employment: "Education",
@@ -1329,7 +1329,6 @@ export default function Home() {
                         type="button"
                         className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
                         data-title-density={getPosterTitleDensity(entry.title)}
-                        data-linked={entry.href ? "true" : undefined}
                         aria-label={`Open ${entry.title} poster`}
                         onClick={(event) => openPoster(entry, event.currentTarget)}
                       >
@@ -1448,7 +1447,7 @@ export default function Home() {
                       href={activePoster.href}
                       target="_blank"
                       rel="noreferrer"
-                    >View repository <span aria-hidden="true">↗</span></a>
+                    >View repository</a>
                   )}
                 </div>
               </aside>
