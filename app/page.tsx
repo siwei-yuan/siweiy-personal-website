@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 
 const nameVertexShader = /* glsl */ `
@@ -195,6 +195,8 @@ const dossierSections = [
   },
 ] as const;
 
+type PosterEntry = (typeof dossierSections)[number]["entries"][number];
+
 function createNameGeometry(label: string) {
   const canvas = document.createElement("canvas");
   canvas.width = 1800;
@@ -265,6 +267,40 @@ export default function Home() {
   const sceneMountRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const pulseRef = useRef(0);
+  const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
+
+  const handlePosterMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const poster = event.currentTarget;
+    const bounds = poster.getBoundingClientRect();
+    const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
+    poster.style.setProperty("--poster-follow-x", `${horizontal * 14}px`);
+    poster.style.setProperty("--poster-follow-y", `${vertical * 10}px`);
+    poster.style.setProperty("--poster-tilt-x", `${vertical * -4.2}deg`);
+    poster.style.setProperty("--poster-tilt-y", `${horizontal * 5.2}deg`);
+  };
+
+  const resetPosterPose = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const poster = event.currentTarget;
+    poster.style.setProperty("--poster-follow-x", "0px");
+    poster.style.setProperty("--poster-follow-y", "0px");
+    poster.style.setProperty("--poster-tilt-x", "0deg");
+    poster.style.setProperty("--poster-tilt-y", "0deg");
+  };
+
+  useEffect(() => {
+    if (!activePoster) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActivePoster(null);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [activePoster]);
 
   useEffect(() => {
     const mount = sceneMountRef.current;
@@ -867,11 +903,20 @@ export default function Home() {
               <div className="dossier-records">
                 <div className="records-list">
                   {section.entries.map((entry) => (
-                    <article key={entry.title}>
-                      <span>{entry.marker}</span>
-                      <h3>{entry.title}</h3>
-                      <p>{entry.detail}</p>
-                    </article>
+                    <div className="poster-anchor" key={entry.title}>
+                      <button
+                        type="button"
+                        className="poster-card"
+                        aria-label={`Open ${entry.title} poster`}
+                        onPointerMove={handlePosterMove}
+                        onPointerLeave={resetPosterPose}
+                        onClick={() => setActivePoster(entry)}
+                      >
+                        <span>{entry.marker}</span>
+                        <h3>{entry.title}</h3>
+                        <p>{entry.detail}</p>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -879,6 +924,35 @@ export default function Home() {
           </section>
         ))}
       </main>
+
+      {activePoster && (
+        <div
+          className="poster-modal"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setActivePoster(null);
+          }}
+        >
+          <article
+            className="poster-focus-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="poster-focus-title"
+          >
+            <button
+              type="button"
+              className="poster-close"
+              aria-label="Close poster"
+              onClick={() => setActivePoster(null)}
+              autoFocus
+            >
+              ×
+            </button>
+            <span>{activePoster.marker}</span>
+            <h3 id="poster-focus-title">{activePoster.title}</h3>
+            <p>{activePoster.detail}</p>
+          </article>
+        </div>
+      )}
     </div>
   );
 }
