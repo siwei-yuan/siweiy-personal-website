@@ -1,13 +1,13 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { flushSync } from "react-dom";
 import * as THREE from "three";
 
 const nameVertexShader = /* glsl */ `
@@ -275,7 +275,11 @@ const dossierSections: readonly DossierSection[] = [
     ],
   },
 ];
-type PosterMotion = { x: number; y: number; scale: number };
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (update: () => void | Promise<void>) => {
+    finished: Promise<void>;
+  };
+};
 
 function createNameGeometry(label: string) {
   const canvas = document.createElement("canvas");
@@ -348,54 +352,95 @@ export default function Home() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorLightRef = useRef<HTMLDivElement>(null);
   const posterDialogRef = useRef<HTMLElement>(null);
-  const posterSourceRef = useRef<{ x: number; y: number; width: number } | null>(null);
+  const posterSourceRef = useRef<HTMLButtonElement | null>(null);
   const posterCloseTimerRef = useRef<number | null>(null);
   const posterClosingRef = useRef(false);
   const pulseRef = useRef(0);
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
-  const [posterMotion, setPosterMotion] = useState<PosterMotion>({ x: 0, y: 80, scale: 0.72 });
   const [isPosterReady, setIsPosterReady] = useState(false);
   const [isPosterClosing, setIsPosterClosing] = useState(false);
 
-  const openPoster = (entry: PosterEntry, source: HTMLElement) => {
-    const bounds = source.getBoundingClientRect();
+  const openPoster = async (entry: PosterEntry, source: HTMLButtonElement) => {
+    if (activePoster || posterClosingRef.current) return;
     if (posterCloseTimerRef.current !== null) window.clearTimeout(posterCloseTimerRef.current);
-    posterSourceRef.current = {
-      x: bounds.left + bounds.width / 2,
-      y: bounds.top + bounds.height / 2,
-      width: bounds.width,
-    };
+    posterSourceRef.current = source;
     posterClosingRef.current = false;
-    setIsPosterReady(false);
-    setIsPosterClosing(false);
-    setActivePoster(entry);
+    const transitionDocument = document as ViewTransitionDocument;
+
+    if (!transitionDocument.startViewTransition) {
+      setIsPosterClosing(false);
+      setActivePoster(entry);
+      window.requestAnimationFrame(() => setIsPosterReady(true));
+      return;
+    }
+
+    // The clicked card is the old shared element. During the same DOM update,
+    // its identity is handed to the inspection card instead of duplicating it.
+    source.style.viewTransitionName = "poster-object";
+    const transition = transitionDocument.startViewTransition(() => {
+      source.style.viewTransitionName = "";
+      flushSync(() => {
+        setIsPosterReady(false);
+        setIsPosterClosing(false);
+        setActivePoster(entry);
+      });
+    });
+
+    try {
+      await transition.finished;
+    } catch {
+      // A superseded browser transition still leaves the DOM in its new state.
+    } finally {
+      source.style.viewTransitionName = "";
+      if (posterSourceRef.current === source && !posterClosingRef.current) {
+        setIsPosterReady(true);
+      }
+    }
   };
 
-  const closeActivePoster = () => {
+  const closeActivePoster = useCallback(async () => {
     if (!activePoster || posterClosingRef.current) return;
     posterClosingRef.current = true;
     setIsPosterClosing(true);
-    posterCloseTimerRef.current = window.setTimeout(() => {
+
+    const hasDetailSheet = Boolean(activePoster.summary || activePoster.highlights?.length);
+    if (hasDetailSheet && isPosterReady) {
+      await new Promise<void>((resolve) => {
+        posterCloseTimerRef.current = window.setTimeout(() => {
+          posterCloseTimerRef.current = null;
+          resolve();
+        }, 330);
+      });
+    }
+
+    const source = posterSourceRef.current;
+    const transitionDocument = document as ViewTransitionDocument;
+    if (!source || !transitionDocument.startViewTransition) {
       setActivePoster(null);
       setIsPosterReady(false);
       setIsPosterClosing(false);
       posterClosingRef.current = false;
-      posterCloseTimerRef.current = null;
-    }, 420);
-  };
+      return;
+    }
 
-  useLayoutEffect(() => {
-    if (!activePoster || !posterDialogRef.current || !posterSourceRef.current) return;
-    const bounds = posterDialogRef.current.getBoundingClientRect();
-    const source = posterSourceRef.current;
-    setPosterMotion({
-      x: source.x - (bounds.left + bounds.width / 2),
-      y: source.y - (bounds.top + bounds.height / 2),
-      scale: Math.min(0.96, Math.max(0.28, source.width / bounds.width)),
+    const transition = transitionDocument.startViewTransition(() => {
+      flushSync(() => {
+        setActivePoster(null);
+        setIsPosterReady(false);
+      });
+      source.style.viewTransitionName = "poster-object";
     });
-    const readyFrame = window.requestAnimationFrame(() => setIsPosterReady(true));
-    return () => window.cancelAnimationFrame(readyFrame);
-  }, [activePoster]);
+
+    try {
+      await transition.finished;
+    } catch {
+      // A skipped transition should still complete the close state cleanly.
+    } finally {
+      source.style.viewTransitionName = "";
+      setIsPosterClosing(false);
+      posterClosingRef.current = false;
+    }
+  }, [activePoster, isPosterReady]);
 
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
     const poster = event.currentTarget;
@@ -448,7 +493,7 @@ export default function Home() {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
-  }, [activePoster]);
+  }, [activePoster, closeActivePoster]);
 
   useEffect(() => () => {
     if (posterCloseTimerRef.current !== null) window.clearTimeout(posterCloseTimerRef.current);
@@ -1065,7 +1110,7 @@ export default function Home() {
                     <div className="poster-anchor" key={entry.title}>
                       <button
                         type="button"
-                        className="poster-card"
+                        className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
                         aria-label={`Open ${entry.title} poster`}
                         onPointerMove={handlePosterMove}
                         onPointerLeave={resetPosterPose}
@@ -1087,9 +1132,7 @@ export default function Home() {
       {activePoster && (
         <div
           className={`poster-modal${isPosterReady ? " is-ready" : ""}${isPosterClosing ? " is-closing" : ""}`}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closeActivePoster();
-          }}
+          onClick={closeActivePoster}
         >
           <div className="poster-inspection">
             <article
@@ -1099,11 +1142,7 @@ export default function Home() {
               aria-modal="true"
               aria-labelledby="poster-focus-title"
               tabIndex={-1}
-              style={{
-                "--poster-origin-x": `${posterMotion.x}px`,
-                "--poster-origin-y": `${posterMotion.y}px`,
-                "--poster-origin-scale": posterMotion.scale,
-              } as CSSProperties}
+              onClick={(event) => event.stopPropagation()}
               onPointerMove={handlePosterMove}
               onPointerLeave={resetPosterPose}
             >
@@ -1112,8 +1151,12 @@ export default function Home() {
               <p>{activePoster.detail}</p>
             </article>
 
-            {(activePoster.summary || activePoster.highlights?.length) && (
-              <aside className="poster-detail-sheet" aria-label={`${activePoster.title} details`}>
+            {isPosterReady && (activePoster.summary || activePoster.highlights?.length) && (
+              <aside
+                className="poster-detail-sheet"
+                aria-label={`${activePoster.title} details`}
+                onClick={(event) => event.stopPropagation()}
+              >
                 <header>
                   <span>Experience record / extracted sheet</span>
                   <b>{activePoster.marker}</b>

@@ -534,6 +534,14 @@ body::selection { background: var(--red); color: #fff; }
   outline-offset: 5px;
 }
 
+.records-list .poster-card.is-poster-source {
+  visibility: hidden;
+}
+
+.records-list .poster-anchor:has(.poster-card.is-poster-source)::before {
+  opacity: 0;
+}
+
 .records-list .poster-card::before,
 .poster-focus-card::before {
   content: "";
@@ -607,20 +615,14 @@ body::selection { background: var(--red); color: #fff; }
   justify-content: center;
   width: min(94vw, 1120px);
   max-height: 92vh;
-  visibility: hidden;
   pointer-events: none;
 }
-
-.poster-modal.is-ready .poster-inspection { visibility: visible; }
 
 .poster-focus-card {
   --poster-light-x: 50%;
   --poster-light-y: 42%;
   --poster-light-core: rgba(255,255,255,0);
   --poster-light-mid: rgba(195,218,224,0);
-  --poster-origin-x: 0px;
-  --poster-origin-y: 80px;
-  --poster-origin-scale: .72;
   position: relative;
   z-index: 2;
   display: flex;
@@ -647,7 +649,7 @@ body::selection { background: var(--red); color: #fff; }
     0 42px 120px rgba(0,0,0,.72),
     0 0 54px rgba(170, 203, 208, .12);
   pointer-events: auto;
-  animation: none;
+  view-transition-name: poster-object;
 }
 
 .poster-focus-card[data-pointer-lit="true"] {
@@ -656,10 +658,6 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 .poster-focus-card:focus { outline: none; }
-
-.poster-modal.is-ready:not(.is-closing) .poster-focus-card {
-  animation: poster-focus-in 420ms cubic-bezier(.16,.78,.2,1) both;
-}
 
 .poster-focus-card h3 {
   font-size: clamp(2.35rem, 3.35vw, 4.75rem);
@@ -811,11 +809,6 @@ body::selection { background: var(--red); color: #fff; }
 
 .poster-modal.is-closing {
   pointer-events: none;
-  animation: poster-backdrop-out 420ms ease both;
-}
-
-.poster-modal.is-closing .poster-focus-card {
-  animation: poster-focus-out 420ms cubic-bezier(.42,0,.78,.34) both;
 }
 
 .poster-modal.is-closing .poster-detail-sheet {
@@ -827,31 +820,6 @@ body::selection { background: var(--red); color: #fff; }
   to { opacity: 1; }
 }
 
-@keyframes poster-backdrop-out {
-  from { opacity: 1; }
-  to { opacity: 0; }
-}
-
-@keyframes poster-focus-in {
-  0% {
-    opacity: .18;
-    transform: translate(var(--poster-origin-x), var(--poster-origin-y)) scale(var(--poster-origin-scale));
-    filter: blur(2px);
-  }
-  68% { opacity: 1; transform: translateY(-5px) scale(1.015); filter: blur(0); }
-  100% { opacity: 1; transform: translateY(0) scale(1) rotate(0); }
-}
-
-@keyframes poster-focus-out {
-  0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  28% { opacity: 1; transform: translateY(4px) scale(.985); filter: blur(0); }
-  100% {
-    opacity: .08;
-    transform: translate(var(--poster-origin-x), var(--poster-origin-y)) scale(var(--poster-origin-scale));
-    filter: blur(2px);
-  }
-}
-
 @keyframes detail-sheet-in {
   0% { opacity: 0; transform: translateX(-72%) scaleX(.82); filter: blur(2px); }
   72% { opacity: 1; transform: translateX(6px) scaleX(1.012); filter: blur(0); }
@@ -861,6 +829,28 @@ body::selection { background: var(--red); color: #fff; }
 @keyframes detail-sheet-out {
   from { opacity: 1; transform: translateX(0) scaleX(1); }
   to { opacity: 0; transform: translateX(-78%) scaleX(.86); filter: blur(2px); }
+}
+
+/* The poster is one shared scene object. The browser interpolates its actual
+   viewport geometry between the archive slot and the inspection position. */
+html {
+  view-transition-name: none;
+}
+
+::view-transition-group(poster-object) {
+  z-index: 120;
+  animation-duration: 560ms;
+  animation-timing-function: cubic-bezier(.18,.76,.18,1);
+}
+
+::view-transition-image-pair(poster-object) {
+  isolation: auto;
+}
+
+::view-transition-old(poster-object),
+::view-transition-new(poster-object) {
+  mix-blend-mode: normal;
+  backface-visibility: hidden;
 }
 
 @media (max-width: 760px) {
