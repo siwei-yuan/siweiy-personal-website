@@ -28,6 +28,7 @@ const nameVertexShader = /* glsl */ `
   varying float vGlow;
   varying float vFlare;
   varying float vEdge;
+  varying float vCursorRed;
 
   void main() {
     vec3 p = position;
@@ -129,6 +130,17 @@ const nameVertexShader = /* glsl */ `
     finaleTarget.z += sin(uTime * 0.41 + aSeed * 61.0) * 0.025;
     p = mix(p, finaleTarget, finale);
 
+    // The cursor carries a broad red field. It affects a large, irregular
+    // portion of the nearby constellation rather than painting a uniform disc.
+    vec2 pointerColorSpace = mix(
+      vec2(p.x / 10.0, p.y / 3.0),
+      vec2(p.x / 4.8, p.y / 1.9),
+      finale
+    );
+    float colorDistance = length(pointerColorSpace - uPointer);
+    float colorField = 1.0 - smoothstep(0.08, 0.76, colorDistance);
+    float redVariation = fract(sin(aSeed * 613.73) * 1847.31);
+
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
     float glowParticle = step(0.925, aSeed);
@@ -148,6 +160,7 @@ const nameVertexShader = /* glsl */ `
     vGlow = glowPulse;
     vFlare = flarePulse;
     vEdge = smoothstep(0.52, 0.98, horizontalEdge);
+    vCursorRed = colorField * mix(0.42, 1.0, smoothstep(0.16, 0.72, redVariation));
   }
 `;
 
@@ -163,6 +176,7 @@ const nameFragmentShader = /* glsl */ `
   varying float vGlow;
   varying float vFlare;
   varying float vEdge;
+  varying float vCursorRed;
 
   void main() {
     vec2 point = gl_PointCoord - 0.5;
@@ -177,6 +191,9 @@ const nameFragmentShader = /* glsl */ `
     color *= 1.0 + vEdge * 0.18;
     color += vec3(1.36, 1.44, 1.42) * vGlow;
     color += vec3(2.05, 2.16, 2.14) * vFlare;
+    float redMix = smoothstep(0.08, 0.62, vCursorRed);
+    vec3 cursorRed = vec3(1.72, 0.035, 0.018) * (0.92 + vGlow * 0.18);
+    color = mix(color, cursorRed, redMix * 0.94);
     float alpha = circle * (0.84 + vEnergy * 0.17 + vDisperse * 0.14);
     alpha += circle * vEdge * 0.1;
     alpha += softGlow * vGlow * 0.76;
@@ -460,12 +477,13 @@ function createNameGeometry(label: string) {
   context.closePath();
   context.fill();
 
-  // X: two structural strokes rather than another block of typography.
+  // X: two complete crossing strokes. Both diagonals must run through the
+  // centre; a half-stroke reads as a Y once sampled into particles.
   context.beginPath();
   context.moveTo(socialCenters[2] - 56, socialY - 64);
   context.lineTo(socialCenters[2] + 56, socialY + 64);
-  context.moveTo(socialCenters[2] + 50, socialY - 64);
-  context.lineTo(socialCenters[2] + 4, socialY - 12);
+  context.moveTo(socialCenters[2] + 56, socialY - 64);
+  context.lineTo(socialCenters[2] - 56, socialY + 64);
   context.stroke();
 
   const socialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -1079,6 +1097,11 @@ export default function Home() {
         cursorRef.current.style.left = `${event.clientX}px`;
         cursorRef.current.style.top = `${event.clientY}px`;
         cursorRef.current.style.opacity = "1";
+        const pointerTarget = event.target instanceof Element ? event.target : null;
+        const isInteractive = Boolean(pointerTarget?.closest(
+          "a, button, [role='button'], [role='link'], [data-clickable='true']",
+        ));
+        cursorRef.current.classList.toggle("is-interactive", isInteractive);
       }
       if (cursorLightRef.current) {
         cursorLightRef.current.style.left = `${event.clientX}px`;
@@ -1097,6 +1120,7 @@ export default function Home() {
       pointerActive = false;
       targetPointer.set(0, 0);
       if (cursorRef.current) cursorRef.current.style.opacity = "0";
+      cursorRef.current?.classList.remove("is-interactive");
       if (cursorLightRef.current) cursorLightRef.current.style.opacity = "0";
     };
     window.addEventListener("pointermove", onPointerMove, { passive: true });
