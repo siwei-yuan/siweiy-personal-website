@@ -910,7 +910,8 @@ body::selection { background: var(--red); color: #fff; }
 
 .detail-project-shot[data-orientation="portrait"] > div {
   height: clamp(150px, 23vh, 210px);
-  background-position: center top;
+  background-position: center -10px;
+  background-size: calc(100% + 26px) auto;
 }
 
 .detail-project-shot figcaption {

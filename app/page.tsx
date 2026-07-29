@@ -1439,7 +1439,7 @@ export default function Home() {
                         aria-label={activePoster.screenshotAlt ?? `${activePoster.title} product screenshot`}
                         style={{ backgroundImage: `url("${activePoster.screenshot}")` }}
                       />
-                      <figcaption>Field image / live interface</figcaption>
+                      <figcaption>Image</figcaption>
                     </figure>
                   )}
                   {activePoster.href && (
