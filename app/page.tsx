@@ -17,6 +17,7 @@ const nameVertexShader = /* glsl */ `
   varying float vLens;
   varying float vDisperse;
   varying float vGlow;
+  varying float vEdge;
 
   void main() {
     vec3 p = position;
@@ -119,6 +120,7 @@ const nameVertexShader = /* glsl */ `
     vLens = max(horizon * rimParticle, innerBand * fallingParticle);
     vDisperse = driftEnergy;
     vGlow = glowPulse;
+    vEdge = smoothstep(0.52, 0.98, horizontalEdge);
   }
 `;
 
@@ -131,6 +133,7 @@ const nameFragmentShader = /* glsl */ `
   varying float vLens;
   varying float vDisperse;
   varying float vGlow;
+  varying float vEdge;
 
   void main() {
     vec2 point = gl_PointCoord - 0.5;
@@ -142,8 +145,10 @@ const nameFragmentShader = /* glsl */ `
     vec3 color = mix(bone, spectral, vLens * 0.42);
     float tonalVariation = mix(0.82, 1.18, fract(sin(vSeed * 437.13) * 1731.87));
     color *= tonalVariation;
+    color *= 1.0 + vEdge * 0.18;
     color += vec3(1.36, 1.44, 1.42) * vGlow;
     float alpha = circle * (0.84 + vEnergy * 0.17 + vDisperse * 0.14);
+    alpha += circle * vEdge * 0.1;
     alpha += softGlow * vGlow * 0.76;
     alpha *= uFade * (1.0 - uExit);
     if (alpha < 0.02) discard;
