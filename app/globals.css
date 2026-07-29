@@ -1084,34 +1084,95 @@ html {
 
 @media (max-width: 760px) {
   .hero-spacer { min-height: 105svh; }
-  .dossier-section { min-height: 230svh; }
+
+  /* Mobile sections are a real document flow, not a cropped desktop stage. */
+  .dossier-section {
+    --records-progress: 1;
+    min-height: auto;
+    padding: clamp(96px, 16svh, 150px) 0 clamp(120px, 20svh, 190px);
+  }
+
+  .dossier-sticky {
+    position: relative;
+    top: auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .section-title-position {
+    position: relative;
+    inset: auto;
+    display: block;
+    padding: 0 20px;
+    transform: none;
+  }
+
+  .section-title-hit,
+  .dossier-section.is-title-visible .section-title-hit {
+    justify-content: flex-start;
+    opacity: 1;
+    transform: none;
+  }
+
+  .section-title-hit h2 {
+    width: 100%;
+    max-width: none;
+    font-size: clamp(3.2rem, 17vw, 7rem);
+    line-height: .78;
+  }
+
+  .dossier-section.is-title-visible .section-title-hit h2 {
+    animation: none;
+  }
+
   .dossier-records,
   .dossier-section[data-section="chronology"] .dossier-records {
-    top: 22vh;
-    right: 16px;
-    bottom: auto;
-    left: 16px;
-  }
-  .records-list {
-    grid-template-columns: 1fr;
-    gap: 34px;
-    padding: 8px 0 24px 42px;
-  }
-  .records-list::before {
-    left: 18px;
+    position: relative;
+    top: auto;
     right: auto;
-    top: 0;
-    bottom: 0;
+    bottom: auto;
+    left: auto;
+    margin-top: clamp(76px, 13svh, 120px);
+    opacity: 1;
+    transform: none;
+  }
+
+  .records-list {
+    --mobile-poster-min: 220px;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, var(--mobile-poster-min)), 1fr)
+    );
+    align-items: start;
+    justify-content: center;
+    width: min(100%, 720px);
+    margin: 0 auto;
+    gap: clamp(48px, 10vw, 76px) clamp(24px, 5vw, 40px);
+    padding: 8px 24px 24px;
+  }
+
+  .records-list::before {
+    left: 50%;
+    right: auto;
+    top: -28px;
+    bottom: -28px;
     width: 1px;
     height: auto;
-    transform: scaleY(var(--records-progress));
-    transform-origin: 50% 0;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(197, 213, 215, .48) 6%,
+      rgba(197, 213, 215, .48) 94%,
+      transparent
+    );
+    transform: none;
   }
+
   .records-list.is-expanded::before {
-    left: 18px;
+    left: 50%;
     right: auto;
-    top: 0;
-    bottom: 0;
+    top: -28px;
+    bottom: -28px;
     width: 1px;
     height: auto;
     border: 0;
@@ -1122,64 +1183,116 @@ html {
       rgba(197, 213, 215, .58) 93%,
       transparent
     );
-    transform: scaleY(var(--records-progress));
-    transform-origin: 50% 0;
+    opacity: 1;
+    transform: none;
   }
+
   .records-list .poster-anchor {
-    width: min(100%, 340px);
+    width: min(100%, 300px);
     justify-self: center;
+    transform: rotate(var(--poster-angle));
   }
+
   .records-list.is-expanded {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(3, auto);
-    grid-template-areas:
-      "poster-1 poster-2"
-      "poster-3 poster-4"
-      "poster-5 poster-6";
-    width: 100%;
-    gap: 18px;
-    padding-left: 18px;
+    --mobile-poster-min: 220px;
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(min(100%, var(--mobile-poster-min)), 1fr)
+    );
+    grid-template-rows: none;
+    grid-template-areas: none;
+    width: min(100%, 720px);
+    gap: clamp(48px, 10vw, 76px) clamp(24px, 5vw, 40px);
+    padding: 8px 24px 24px;
   }
-  .records-list.is-expanded .poster-anchor,
-  .records-list.is-expanded .poster-anchor:nth-child(4),
-  .records-list.is-expanded .poster-anchor:nth-child(5),
-  .records-list.is-expanded .poster-anchor:nth-child(6) {
-    grid-column: span 1;
-    width: 100%;
-  }
-  .records-list.is-expanded .poster-anchor:nth-child(5) {
-    grid-column: 1 / -1;
-    width: calc(50% - 9px);
+
+  .records-list.is-expanded .poster-anchor:nth-child(n) {
+    grid-area: auto;
+    grid-column: auto;
+    width: min(100%, 300px);
     justify-self: center;
   }
-  .records-list.is-expanded:has(.poster-anchor:nth-child(6)) .poster-anchor:nth-child(5) {
-    grid-column: span 1;
-    width: 100%;
-    justify-self: auto;
+
+  .poster-modal {
+    display: block;
+    padding: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
+
   .poster-inspection {
     flex-direction: column;
     justify-content: flex-start;
-    width: 92vw;
-    max-height: 94vh;
-    padding: 3vh 0 5vh;
-    overflow-y: auto;
+    width: 100%;
+    min-height: 100%;
+    max-height: none;
+    padding: max(28px, env(safe-area-inset-top)) 18px max(72px, env(safe-area-inset-bottom));
+    overflow: visible;
   }
+
   .poster-focus-shell {
-    width: min(86vw, 390px);
+    width: min(82vw, 340px);
     flex: 0 0 auto;
   }
+
   .poster-detail-sheet {
-    width: min(86vw, 390px);
+    width: min(90vw, 420px);
     min-height: auto;
     max-height: none;
-    margin: 24px 0 0;
+    margin: 36px 0 0;
     flex: 0 0 auto;
     padding: 28px;
+    overflow: visible;
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, -18px, 0);
+    transform-origin: 50% 0;
   }
+
+  .poster-modal.is-ready .poster-detail-sheet {
+    animation-name: detail-sheet-in-mobile;
+  }
+
+  .poster-modal.is-closing .poster-detail-sheet {
+    animation-name: detail-sheet-out-mobile;
+  }
+
   .poster-detail-sheet h4 { font-size: clamp(2.1rem, 10vw, 3.6rem); }
+  .poster-detail-sheet dl { grid-template-columns: 64px 1fr; }
+  .detail-project-shot { width: 100%; }
+  .detail-project-shot[data-orientation="portrait"] {
+    width: min(66%, 230px);
+    margin-right: 8%;
+  }
+
   .social-links { width: 100vw; }
   .social-link { width: clamp(112px, 28vw, 140px); }
+}
+
+@keyframes detail-sheet-in-mobile {
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, -18px, 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes detail-sheet-out-mobile {
+  from {
+    opacity: 1;
+    clip-path: inset(0);
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0);
+    transform: translate3d(0, -18px, 0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

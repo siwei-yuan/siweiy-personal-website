@@ -449,6 +449,7 @@ export default function Home() {
   }, [activePoster, isPosterReady]);
 
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return;
     const interactionRoot = event.currentTarget;
     const poster = interactionRoot.matches(".poster-card, .poster-focus-card")
       ? interactionRoot
