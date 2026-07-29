@@ -346,22 +346,28 @@ body::selection { background: var(--red); color: #fff; }
   padding: 8px clamp(12px, 3vw, 48px) 18px;
 }
 
-.dossier-section[data-section="chronology"] .dossier-records { top: 10vh; }
+.dossier-section[data-section="chronology"] .dossier-records { top: 16vh; }
 
 .records-list.is-expanded {
-  --timeline-card: clamp(172px, 16vw, 200px);
+  --timeline-card: clamp(166px, 15vw, 190px);
   grid-template-columns: repeat(3, var(--timeline-card));
+  grid-template-rows: repeat(2, calc(var(--timeline-card) * 1.25));
+  grid-template-areas:
+    "poster-1 poster-2 poster-3"
+    "poster-6 poster-5 poster-4";
   justify-content: space-between;
   width: min(90vw, 1040px);
   margin: 0 auto;
-  gap: clamp(54px, 7vh, 82px) clamp(56px, 7vw, 122px);
+  gap: clamp(44px, 5.5vh, 64px) clamp(56px, 7vw, 122px);
   padding: 8px 0 18px;
 }
 
-.records-list.is-expanded .poster-anchor { grid-column: auto; }
-.records-list.is-expanded .poster-anchor:nth-child(4) { grid-column: 3; }
-.records-list.is-expanded .poster-anchor:nth-child(5) { grid-column: 2; }
-.records-list.is-expanded .poster-anchor:nth-child(6) { grid-column: 1; }
+.records-list.is-expanded .poster-anchor:nth-child(1) { grid-area: poster-1; }
+.records-list.is-expanded .poster-anchor:nth-child(2) { grid-area: poster-2; }
+.records-list.is-expanded .poster-anchor:nth-child(3) { grid-area: poster-3; }
+.records-list.is-expanded .poster-anchor:nth-child(4) { grid-area: poster-4; }
+.records-list.is-expanded .poster-anchor:nth-child(5) { grid-area: poster-5; }
+.records-list.is-expanded .poster-anchor:nth-child(6) { grid-area: poster-6; }
 
 .records-list::before {
   content: "";
@@ -891,6 +897,11 @@ html {
   }
   .records-list.is-expanded {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(3, auto);
+    grid-template-areas:
+      "poster-1 poster-2"
+      "poster-3 poster-4"
+      "poster-5 poster-6";
     width: 100%;
     gap: 18px;
     padding-left: 18px;
