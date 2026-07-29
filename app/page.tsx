@@ -238,7 +238,7 @@ function getPosterTitleDensity(title: string) {
 const dossierSections: readonly DossierSection[] = [
   {
     id: "chronology",
-    label: "Chronology",
+    label: "Timeline",
     entries: [
       {
         marker: "MAY 2026—NOW",
@@ -1295,7 +1295,7 @@ export default function Home() {
       <main className="scroll-story">
         <section className="hero-spacer" aria-labelledby="site-title">
           <h1 id="site-title" className="sr-only">Siwei Yuan</h1>
-          <a className="scroll-cue" href="#chronology" aria-label="Scroll to chronology" />
+          <a className="scroll-cue" href="#chronology" aria-label="Scroll to timeline" />
         </section>
 
         {dossierSections.map((section) => (

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Siwei Yuan — Selected Work",
-  description: "The personal archive of Siwei Yuan: chronology, projects, and signals.",
+  description: "The personal archive of Siwei Yuan: timeline, projects, and signals.",
 };
 
 export default function RootLayout({
