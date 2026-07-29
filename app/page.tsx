@@ -17,6 +17,7 @@ const nameVertexShader = /* glsl */ `
   varying float vLens;
   varying float vDisperse;
   varying float vGlow;
+  varying float vFlare;
   varying float vEdge;
 
   void main() {
@@ -113,13 +114,18 @@ const nameVertexShader = /* glsl */ `
     float glowPulse = glowParticle * (0.38 + 0.62 * (0.5 + 0.5 * sin(
       uTime * (0.72 + aSpeed * 1.25) + aSeed * 113.0
     )));
-    gl_PointSize = (0.94 + aSize * 1.16 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.25) * (24.0 / -viewPosition.z);
+    float flareParticle = step(0.982, aSeed);
+    float flarePulse = flareParticle * (0.62 + 0.38 * (0.5 + 0.5 * sin(
+      uTime * (1.1 + aSpeed * 1.4) + aSeed * 151.0
+    )));
+    gl_PointSize = (0.94 + aSize * 1.16 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.25 + flareParticle * 2.8) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring + horizon * rimParticle * 0.46 + innerBand * fallingParticle * 0.5;
     vLens = max(horizon * rimParticle, innerBand * fallingParticle);
     vDisperse = driftEnergy;
     vGlow = glowPulse;
+    vFlare = flarePulse;
     vEdge = smoothstep(0.52, 0.98, horizontalEdge);
   }
 `;
@@ -133,6 +139,7 @@ const nameFragmentShader = /* glsl */ `
   varying float vLens;
   varying float vDisperse;
   varying float vGlow;
+  varying float vFlare;
   varying float vEdge;
 
   void main() {
@@ -147,9 +154,11 @@ const nameFragmentShader = /* glsl */ `
     color *= tonalVariation;
     color *= 1.0 + vEdge * 0.18;
     color += vec3(1.36, 1.44, 1.42) * vGlow;
+    color += vec3(2.05, 2.16, 2.14) * vFlare;
     float alpha = circle * (0.84 + vEnergy * 0.17 + vDisperse * 0.14);
     alpha += circle * vEdge * 0.1;
     alpha += softGlow * vGlow * 0.76;
+    alpha += softGlow * vFlare * 1.05;
     alpha *= uFade * (1.0 - uExit);
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
@@ -430,9 +439,9 @@ export default function Home() {
 
     // A hand-built three-face monolith: one uninterrupted front plane faces
     // the viewer, while two widened side wings create the reverse perspective.
-    const frontVertices = [-10.1, 8.6, 0.55, 0, -8.6, 2.0, 10.1, 8.6, 0.55];
-    const leftVertices = [-13.25, 8.6, -0.85, 0, -8.6, 2.0, -10.1, 8.6, 0.55];
-    const rightVertices = [10.1, 8.6, 0.55, 0, -8.6, 2.0, 13.25, 8.6, -0.85];
+    const frontVertices = [-11.0, 8.6, 0.55, 0, -8.6, 2.0, 11.0, 8.6, 0.55];
+    const leftVertices = [-14.35, 8.6, -0.85, 0, -8.6, 2.0, -11.0, 8.6, 0.55];
+    const rightVertices = [11.0, 8.6, 0.55, 0, -8.6, 2.0, 14.35, 8.6, -0.85];
     const makeFaceGeometry = (vertices: number[], colors: number[]) => {
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.Float32BufferAttribute(vertices, 3));
@@ -598,12 +607,12 @@ export default function Home() {
       }
     };
     addGlowingSeam(
-      new THREE.Vector3(-10.1, 8.6, 0.55),
+      new THREE.Vector3(-11.0, 8.6, 0.55),
       new THREE.Vector3(0, -8.6, 2.0),
       0x91b5bc,
     );
     addGlowingSeam(
-      new THREE.Vector3(10.1, 8.6, 0.55),
+      new THREE.Vector3(11.0, 8.6, 0.55),
       new THREE.Vector3(0, -8.6, 2.0),
       0xff3027,
     );
@@ -624,8 +633,8 @@ export default function Home() {
       blending: THREE.AdditiveBlending,
     });
     const redEdgeGeometry = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(10.1, 8.6, 0.55), new THREE.Vector3(13.25, 8.6, -0.85),
-      new THREE.Vector3(13.25, 8.6, -0.85), new THREE.Vector3(0, -8.6, 2.0),
+      new THREE.Vector3(11.0, 8.6, 0.55), new THREE.Vector3(14.35, 8.6, -0.85),
+      new THREE.Vector3(14.35, 8.6, -0.85), new THREE.Vector3(0, -8.6, 2.0),
     ]);
     const pyramidRedEdges = new THREE.LineSegments(redEdgeGeometry, redEdgeMaterial);
     pyramidRedEdges.renderOrder = 2;
@@ -633,11 +642,11 @@ export default function Home() {
 
     // The eclipse is physically behind the monolith. The opaque pyramid writes
     // depth first, masking the upper arc while the lower half escapes its tip.
-    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(6.32, 192), eclipseMaterial);
+    const eclipseDisc = new THREE.Mesh(new THREE.CircleGeometry(6.9, 192), eclipseMaterial);
     eclipseDisc.position.set(0, 0.45, -8.62);
     eclipseDisc.renderOrder = 1;
     monument.add(eclipseDisc);
-    const halo = new THREE.Mesh(new THREE.CircleGeometry(8.8, 224), haloMaterial);
+    const halo = new THREE.Mesh(new THREE.CircleGeometry(9.6, 224), haloMaterial);
     halo.position.set(0, 0.45, -8.5);
     halo.renderOrder = 2;
     monument.add(halo);
