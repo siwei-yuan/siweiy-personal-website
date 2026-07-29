@@ -108,11 +108,11 @@ const nameVertexShader = /* glsl */ `
 
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
-    float glowParticle = step(0.94, aSeed);
+    float glowParticle = step(0.925, aSeed);
     float glowPulse = glowParticle * (0.38 + 0.62 * (0.5 + 0.5 * sin(
       uTime * (0.72 + aSpeed * 1.25) + aSeed * 113.0
     )));
-    gl_PointSize = (0.86 + aSize * 1.08 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.2) * (24.0 / -viewPosition.z);
+    gl_PointSize = (0.94 + aSize * 1.16 + influence * 1.1 + ring * 1.48 + horizon * rimParticle * 0.44 + glowParticle * 2.25) * (24.0 / -viewPosition.z);
 
     vSeed = aSeed;
     vEnergy = influence + ring + horizon * rimParticle * 0.46 + innerBand * fallingParticle * 0.5;
@@ -137,14 +137,14 @@ const nameFragmentShader = /* glsl */ `
     float radius = length(point);
     float circle = 1.0 - smoothstep(0.12, 0.5, radius);
     float softGlow = 1.0 - smoothstep(0.02, 0.5, radius);
-    vec3 bone = vec3(1.16, 1.22, 1.2);
-    vec3 spectral = mix(vec3(0.18, 0.48, 0.58), vec3(0.66, 0.82, 0.88), step(0.52, vSeed));
+    vec3 bone = vec3(1.32, 1.4, 1.38);
+    vec3 spectral = mix(vec3(0.24, 0.58, 0.68), vec3(0.76, 0.94, 1.0), step(0.52, vSeed));
     vec3 color = mix(bone, spectral, vLens * 0.42);
     float tonalVariation = mix(0.82, 1.18, fract(sin(vSeed * 437.13) * 1731.87));
     color *= tonalVariation;
-    color += vec3(1.24, 1.31, 1.28) * vGlow;
-    float alpha = circle * (0.74 + vEnergy * 0.16 + vDisperse * 0.13);
-    alpha += softGlow * vGlow * 0.68;
+    color += vec3(1.36, 1.44, 1.42) * vGlow;
+    float alpha = circle * (0.84 + vEnergy * 0.17 + vDisperse * 0.14);
+    alpha += softGlow * vGlow * 0.76;
     alpha *= uFade * (1.0 - uExit);
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
@@ -486,7 +486,7 @@ export default function Home() {
             + sin(vLocalPosition.x * 3.1 + vLocalPosition.y * 1.7) * 0.018;
           vec3 color = uBaseColor
             + uLightColor * (localFalloff * 0.24 + sourceCore * 0.18) * uStrength;
-          color *= mix(0.44, 1.06, lowerFog) * surfaceVariation;
+          color *= mix(0.49, 1.11, lowerFog) * surfaceVariation;
           vec2 bounceOffset = vLocalPosition.xy - uBouncePosition;
           float reflectedLight = exp(-dot(bounceOffset, bounceOffset) / pow(uBounceRadius, 2.0));
           color += uBounceColor * reflectedLight * uBounceStrength;
