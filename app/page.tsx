@@ -975,6 +975,13 @@ export default function Home() {
     resize();
 
     const finaleSection = document.querySelector<HTMLElement>(".social-finale");
+    const socialLinks = Array.from(
+      document.querySelectorAll<HTMLElement>(".social-link"),
+    );
+    const socialHitTargets = [-3.15, 0, 3.15].map(
+      (x) => new THREE.Vector3(x, 0, 0),
+    );
+    const projectedSocialTarget = new THREE.Vector3();
     let targetFinale = 0;
     let targetScroll = window.scrollY;
     const updateScrollStory = () => {
@@ -1079,6 +1086,23 @@ export default function Home() {
       nameMaterial.uniforms.uExit.value = collapse;
       nameMaterial.uniforms.uFinale.value = currentFinale;
       nameMaterial.uniforms.uFade.value = 1;
+
+      // The particle icons live in projected 3D space, so their screen centres
+      // are not the same as three evenly-spaced CSS columns. Keep each link's
+      // hit area locked to the actual particle target after camera parallax.
+      if (currentFinale > 0.45) {
+        camera.updateMatrixWorld();
+        namePoints.updateMatrixWorld();
+        socialHitTargets.forEach((target, index) => {
+          const link = socialLinks[index];
+          if (!link) return;
+          projectedSocialTarget.copy(target);
+          namePoints.localToWorld(projectedSocialTarget);
+          projectedSocialTarget.project(camera);
+          link.style.left = `${(projectedSocialTarget.x * 0.5 + 0.5) * 100}%`;
+          link.style.top = `${(-projectedSocialTarget.y * 0.5 + 0.5) * 100}%`;
+        });
+      }
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;

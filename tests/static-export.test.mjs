@@ -15,6 +15,8 @@ test("exports the complete portfolio as static HTML", async () => {
   assert.match(html, /Member of Technical Staff/);
   assert.match(html, /Amazon Web Services/);
   assert.match(html, /Open UCLA poster/);
+  assert.match(html, /href="https:\/\/www\.linkedin\.com\/in\/siwei-yuan\/"/);
+  assert.match(html, /href="https:\/\/x\.com\/ysw_Jerry"/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
