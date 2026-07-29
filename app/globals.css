@@ -627,7 +627,8 @@ body::selection { background: var(--red); color: #fff; }
   background: rgba(0, 0, 0, .48);
   -webkit-backdrop-filter: blur(18px) brightness(.48) saturate(.72);
   backdrop-filter: blur(18px) brightness(.48) saturate(.72);
-  animation: poster-backdrop-in 260ms ease both;
+  will-change: background-color, backdrop-filter;
+  animation: poster-backdrop-in 560ms cubic-bezier(.18,.76,.18,1) both;
 }
 
 .poster-inspection {
@@ -823,8 +824,16 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 @keyframes poster-backdrop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    background-color: rgba(0, 0, 0, 0);
+    -webkit-backdrop-filter: blur(0) brightness(1) saturate(1);
+    backdrop-filter: blur(0) brightness(1) saturate(1);
+  }
+  to {
+    background-color: rgba(0, 0, 0, .48);
+    -webkit-backdrop-filter: blur(18px) brightness(.48) saturate(.72);
+    backdrop-filter: blur(18px) brightness(.48) saturate(.72);
+  }
 }
 
 @keyframes detail-sheet-in {
