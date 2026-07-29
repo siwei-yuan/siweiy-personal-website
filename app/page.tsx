@@ -266,26 +266,45 @@ function createNameGeometry(label: string) {
 export default function Home() {
   const sceneMountRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const cursorLightRef = useRef<HTMLDivElement>(null);
   const pulseRef = useRef(0);
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
 
-  const handlePosterMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
     const poster = event.currentTarget;
     const bounds = poster.getBoundingClientRect();
     const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
     const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
+    const anchor = poster.closest<HTMLElement>(".poster-anchor");
     poster.style.setProperty("--poster-follow-x", `${horizontal * 14}px`);
     poster.style.setProperty("--poster-follow-y", `${vertical * 10}px`);
     poster.style.setProperty("--poster-tilt-x", `${vertical * -4.2}deg`);
     poster.style.setProperty("--poster-tilt-y", `${horizontal * 5.2}deg`);
+    poster.style.setProperty("--poster-light-x", `${(horizontal + 0.5) * 100}%`);
+    poster.style.setProperty("--poster-light-y", `${(vertical + 0.5) * 100}%`);
+    poster.dataset.pointerLit = "true";
+    if (anchor) {
+      anchor.dataset.posterActive = "true";
+      anchor.style.setProperty("--poster-shadow-x", `${7 - horizontal * 25}px`);
+      anchor.style.setProperty("--poster-shadow-y", `${8 - vertical * 20}px`);
+    }
   };
 
-  const resetPosterPose = (event: ReactPointerEvent<HTMLButtonElement>) => {
+  const resetPosterPose = (event: ReactPointerEvent<HTMLElement>) => {
     const poster = event.currentTarget;
+    const anchor = poster.closest<HTMLElement>(".poster-anchor");
     poster.style.setProperty("--poster-follow-x", "0px");
     poster.style.setProperty("--poster-follow-y", "0px");
     poster.style.setProperty("--poster-tilt-x", "0deg");
     poster.style.setProperty("--poster-tilt-y", "0deg");
+    poster.style.setProperty("--poster-light-x", "50%");
+    poster.style.setProperty("--poster-light-y", "42%");
+    delete poster.dataset.pointerLit;
+    if (anchor) {
+      delete anchor.dataset.posterActive;
+      anchor.style.setProperty("--poster-shadow-x", "7px");
+      anchor.style.setProperty("--poster-shadow-y", "8px");
+    }
   };
 
   useEffect(() => {
@@ -717,6 +736,11 @@ export default function Home() {
         cursorRef.current.style.top = `${event.clientY}px`;
         cursorRef.current.style.opacity = "1";
       }
+      if (cursorLightRef.current) {
+        cursorLightRef.current.style.left = `${event.clientX}px`;
+        cursorLightRef.current.style.top = `${event.clientY}px`;
+        cursorLightRef.current.style.opacity = "1";
+      }
       targetPointer.set(
         (event.clientX / window.innerWidth) * 2 - 1,
         -((event.clientY / window.innerHeight) * 2 - 1),
@@ -729,6 +753,7 @@ export default function Home() {
       pointerActive = false;
       targetPointer.set(0, 0);
       if (cursorRef.current) cursorRef.current.style.opacity = "0";
+      if (cursorLightRef.current) cursorLightRef.current.style.opacity = "0";
     };
     window.addEventListener("pointermove", onPointerMove, { passive: true });
     window.addEventListener("pointerdown", onPointerDown, { passive: true });
@@ -873,6 +898,7 @@ export default function Home() {
     <div className="site-shell">
       <div ref={sceneMountRef} className="three-scene" aria-hidden="true" />
       <div className="atmosphere" aria-hidden="true" />
+      <div ref={cursorLightRef} className="cursor-light-field" aria-hidden="true" />
       <div className="film-grain" aria-hidden="true" />
       <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
 
@@ -937,6 +963,8 @@ export default function Home() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="poster-focus-title"
+            onPointerMove={handlePosterMove}
+            onPointerLeave={resetPosterPose}
           >
             <button
               type="button"

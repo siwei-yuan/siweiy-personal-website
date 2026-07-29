@@ -98,6 +98,30 @@ body::selection { background: var(--red); color: #fff; }
   opacity: .66;
 }
 
+.cursor-light-field {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: -2;
+  width: min(58vw, 680px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    circle,
+    rgba(207, 226, 231, .115) 0,
+    rgba(151, 185, 193, .06) 25%,
+    rgba(103, 137, 145, .025) 47%,
+    transparent 72%
+  );
+  filter: blur(14px);
+  mix-blend-mode: screen;
+  transition: opacity 220ms ease;
+  will-change: left, top, opacity;
+}
+
 .film-grain {
   position: fixed;
   inset: 0;
@@ -345,6 +369,8 @@ body::selection { background: var(--red); color: #fff; }
 .records-list .poster-anchor {
   --poster-angle: -1.15deg;
   --poster-lift: -8px;
+  --poster-shadow-x: 7px;
+  --poster-shadow-y: 8px;
   position: relative;
   z-index: 1;
   aspect-ratio: 4 / 5;
@@ -362,12 +388,18 @@ body::selection { background: var(--red); color: #fff; }
   inset: 0;
   z-index: 0;
   background: rgba(56, 69, 71, .92);
-  transform: translate(7px, 8px);
+  opacity: .9;
+  transform: translate(var(--poster-shadow-x), var(--poster-shadow-y)) scale(1);
+  transform-origin: 50% 50%;
   box-shadow:
     4px 5px 0 rgba(10, 14, 15, .92),
     0 28px 70px rgba(0,0,0,.48),
     0 0 38px rgba(155, 187, 191, .065);
-  transition: filter 220ms ease, box-shadow 220ms ease;
+  transition:
+    transform 190ms cubic-bezier(.18,.72,.2,1),
+    filter 220ms ease,
+    opacity 220ms ease,
+    box-shadow 220ms ease;
 }
 
 .records-list .poster-card {
@@ -378,6 +410,10 @@ body::selection { background: var(--red); color: #fff; }
   --poster-depth: 0px;
   --poster-scale: 1;
   --poster-hover-y: 0px;
+  --poster-light-x: 50%;
+  --poster-light-y: 42%;
+  --poster-light-core: rgba(255,255,255,0);
+  --poster-light-mid: rgba(195,218,224,0);
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -392,6 +428,12 @@ body::selection { background: var(--red); color: #fff; }
   text-align: left;
   border: 1px solid rgba(244, 249, 247, .6);
   background:
+    radial-gradient(
+      ellipse 58% 48% at var(--poster-light-x) var(--poster-light-y),
+      var(--poster-light-core) 0,
+      var(--poster-light-mid) 34%,
+      transparent 72%
+    ),
     linear-gradient(165deg, rgba(255,255,255,.24), transparent 34%),
     repeating-linear-gradient(0deg, rgba(4,7,8,.018) 0, rgba(4,7,8,.018) 1px, transparent 1px, transparent 4px),
     var(--blue-white);
@@ -426,6 +468,7 @@ body::selection { background: var(--red); color: #fff; }
   --poster-lift: -3px;
 }
 
+.records-list .poster-card[data-pointer-lit="true"],
 .records-list .poster-card:hover,
 .records-list .poster-card:focus-visible {
   --poster-depth: 18px;
@@ -438,18 +481,27 @@ body::selection { background: var(--red); color: #fff; }
     0 0 46px rgba(167, 202, 207, .1);
 }
 
+.records-list .poster-card[data-pointer-lit="true"] {
+  --poster-light-core: rgba(255,255,255,.34);
+  --poster-light-mid: rgba(190,218,225,.13);
+}
+
+.records-list .poster-anchor[data-poster-active="true"],
 .records-list .poster-anchor:has(.poster-card:hover),
 .records-list .poster-anchor:has(.poster-card:focus-visible) {
   z-index: 3;
 }
 
+.records-list .poster-anchor[data-poster-active="true"]::before,
 .records-list .poster-anchor:has(.poster-card:hover)::before,
 .records-list .poster-anchor:has(.poster-card:focus-visible)::before {
-  filter: brightness(.84);
+  opacity: .7;
+  transform: translate(var(--poster-shadow-x), var(--poster-shadow-y)) scale(1.065);
+  filter: blur(2.2px) brightness(.72);
   box-shadow:
-    4px 5px 0 rgba(10, 14, 15, .94),
-    0 36px 82px rgba(0,0,0,.64),
-    0 0 42px rgba(155, 187, 191, .055);
+    3px 4px 0 rgba(10, 14, 15, .7),
+    0 42px 96px rgba(0,0,0,.68),
+    0 0 52px rgba(155, 187, 191, .045);
 }
 
 .records-list .poster-card:focus-visible {
@@ -525,6 +577,10 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 .poster-focus-card {
+  --poster-light-x: 50%;
+  --poster-light-y: 42%;
+  --poster-light-core: rgba(255,255,255,0);
+  --poster-light-mid: rgba(195,218,224,0);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -535,6 +591,12 @@ body::selection { background: var(--red); color: #fff; }
   overflow: hidden;
   border: 1px solid rgba(244, 249, 247, .72);
   background:
+    radial-gradient(
+      ellipse 58% 48% at var(--poster-light-x) var(--poster-light-y),
+      var(--poster-light-core) 0,
+      var(--poster-light-mid) 34%,
+      transparent 72%
+    ),
     linear-gradient(165deg, rgba(255,255,255,.28), transparent 34%),
     repeating-linear-gradient(0deg, rgba(4,7,8,.018) 0, rgba(4,7,8,.018) 1px, transparent 1px, transparent 4px),
     var(--blue-white);
@@ -544,6 +606,11 @@ body::selection { background: var(--red); color: #fff; }
     0 42px 120px rgba(0,0,0,.72),
     0 0 54px rgba(170, 203, 208, .12);
   animation: poster-focus-in 360ms cubic-bezier(.16,.78,.2,1) both;
+}
+
+.poster-focus-card[data-pointer-lit="true"] {
+  --poster-light-core: rgba(255,255,255,.32);
+  --poster-light-mid: rgba(190,218,225,.12);
 }
 
 .poster-focus-card h3 {
