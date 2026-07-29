@@ -4,24 +4,9 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
+test("exports the complete portfolio as static HTML", async () => {
+  const html = await readFile(new URL("../out/index.html", import.meta.url), "utf8");
 
-  return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the portfolio structure and metadata", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-
-  const html = await response.text();
   assert.match(html, /<title>Siwei Yuan — Selected Work<\/title>/i);
   assert.match(html, /Siwei Yuan/);
   assert.match(html, /id="chronology"/);
@@ -33,7 +18,7 @@ test("server-renders the portfolio structure and metadata", async () => {
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
-test("keeps the interactive visual local and removes starter artifacts", async () => {
+test("keeps the interactive visual and accessible content in the source", async () => {
   const [page, layout, packageJson] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
@@ -48,8 +33,7 @@ test("keeps the interactive visual local and removes starter artifacts", async (
   assert.doesNotMatch(page, /Chronology record \/ extracted sheet|Field notes|personnel archive/i);
   assert.match(layout, /title: "Siwei Yuan — Selected Work"/);
   assert.match(packageJson, /"three"/);
-  assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
+  assert.doesNotMatch(packageJson, /cloudflare|drizzle|vinext|wrangler/i);
   await access(new URL("../app/globals.css", import.meta.url));
   await access(root);
 });

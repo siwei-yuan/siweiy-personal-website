@@ -1,21 +1,29 @@
-# YSW — Personal Site
+# Siwei Yuan — Personal Website
 
-An atmospheric one-page portfolio built around a custom Three.js particle field.
+An atmospheric portfolio built with React, Three.js, and custom GLSL shaders.
+The site is statically exported and deployed to GitHub Pages.
 
-## Local development
+## Development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Verification
+## Quality checks
 
 ```bash
-npm run build
+npm run lint
+npx tsc --noEmit
 npm test
 ```
 
-The content in Experience, Projects, and Contact is intentionally placeholder copy for the first design pass.
+`npm test` creates a production static export in `out/` and verifies the
+portfolio structure and metadata in the generated HTML.
+
+## Deployment
+
+Pushes to `main` are built and deployed by the GitHub Pages workflow in
+`.github/workflows/deploy-pages.yml`.
