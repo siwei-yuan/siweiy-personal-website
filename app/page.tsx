@@ -1179,10 +1179,11 @@ export default function Home() {
               </article>
             </div>
 
-            {isPosterReady && (activePoster.summary || activePoster.highlights?.length) && (
+            {(activePoster.summary || activePoster.highlights?.length) && (
               <aside
                 className="poster-detail-sheet"
                 aria-label={`${activePoster.title} details`}
+                aria-hidden={!isPosterReady}
                 onClick={(event) => event.stopPropagation()}
               >
                 <div className="detail-sheet-body">
