@@ -232,7 +232,13 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 @media (pointer: fine) {
-  html, body, .site-shell { cursor: none !important; }
+  html,
+  body,
+  body *,
+  body *::before,
+  body *::after {
+    cursor: none !important;
+  }
 }
 
 @media (pointer: coarse) {
