@@ -1363,13 +1363,14 @@ export default function Home() {
                 rel="noreferrer"
                 aria-label="GitHub"
               ><span>GitHub</span></a>
-              <span
-                className="social-link is-disabled"
+              <a
+                className="social-link"
                 data-network="x"
-                aria-label="X profile link pending"
-                aria-disabled="true"
-                title="X profile link pending"
-              ><span>X</span></span>
+                href="https://x.com/ysw_Jerry"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="X"
+              ><span>X</span></a>
             </nav>
           </div>
         </section>
