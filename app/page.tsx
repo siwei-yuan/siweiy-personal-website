@@ -191,6 +191,13 @@ type DossierSection = {
   entries: readonly PosterEntry[];
 };
 
+function getPosterTitleDensity(title: string) {
+  const longestWord = Math.max(...title.split(/\s+/).map((word) => word.length));
+  if (longestWord >= 11 || title.length >= 32) return "compressed";
+  if (title.length >= 22) return "compact";
+  return "standard";
+}
+
 const dossierSections: readonly DossierSection[] = [
   {
     id: "chronology",
@@ -1137,6 +1144,7 @@ export default function Home() {
                       <button
                         type="button"
                         className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
+                        data-title-density={getPosterTitleDensity(entry.title)}
                         aria-label={`Open ${entry.title} poster`}
                         onClick={(event) => openPoster(entry, event.currentTarget)}
                       >
@@ -1168,6 +1176,7 @@ export default function Home() {
               <article
                 ref={posterDialogRef}
                 className="poster-focus-card"
+                data-title-density={getPosterTitleDensity(activePoster.title)}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="poster-focus-title"

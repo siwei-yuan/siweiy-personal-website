@@ -602,11 +602,24 @@ body::selection { background: var(--red); color: #fff; }
 .poster-focus-card h3 {
   margin: auto 0 clamp(16px, 7cqw, 34px);
   color: #060808;
-  font-size: clamp(1.3rem, 14cqw, 4.5rem);
+  font-size: clamp(1.2rem, 13cqw, 4.15rem);
   font-weight: 900;
   line-height: .82;
   letter-spacing: -.07em;
   text-transform: uppercase;
+}
+
+.poster-card[data-title-density="compact"] h3,
+.poster-focus-card[data-title-density="compact"] h3 {
+  font-size: clamp(1.12rem, 11.65cqw, 3.8rem);
+  line-height: .84;
+}
+
+.poster-card[data-title-density="compressed"] h3,
+.poster-focus-card[data-title-density="compressed"] h3 {
+  font-size: clamp(1.02rem, 10.35cqw, 3.45rem);
+  line-height: .86;
+  letter-spacing: -.065em;
 }
 
 .records-list p,
