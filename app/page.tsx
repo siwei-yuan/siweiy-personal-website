@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import * as THREE from "three";
 
 const nameVertexShader = /* glsl */ `
@@ -196,6 +202,7 @@ const dossierSections = [
 ] as const;
 
 type PosterEntry = (typeof dossierSections)[number]["entries"][number];
+type PosterMotion = { x: number; y: number; scale: number };
 
 function createNameGeometry(label: string) {
   const canvas = document.createElement("canvas");
@@ -267,8 +274,42 @@ export default function Home() {
   const sceneMountRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorLightRef = useRef<HTMLDivElement>(null);
+  const posterDialogRef = useRef<HTMLElement>(null);
+  const posterCloseTimerRef = useRef<number | null>(null);
+  const posterClosingRef = useRef(false);
   const pulseRef = useRef(0);
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
+  const [posterMotion, setPosterMotion] = useState<PosterMotion>({ x: 0, y: 80, scale: 0.72 });
+  const [isPosterClosing, setIsPosterClosing] = useState(false);
+
+  const openPoster = (entry: PosterEntry, source: HTMLElement) => {
+    const bounds = source.getBoundingClientRect();
+    const compact = window.innerWidth <= 760;
+    const focusWidth = compact
+      ? Math.min(window.innerWidth * 0.86, 390)
+      : Math.min(window.innerWidth * 0.38, 480);
+    if (posterCloseTimerRef.current !== null) window.clearTimeout(posterCloseTimerRef.current);
+    posterClosingRef.current = false;
+    setIsPosterClosing(false);
+    setPosterMotion({
+      x: bounds.left + bounds.width / 2 - window.innerWidth / 2,
+      y: bounds.top + bounds.height / 2 - window.innerHeight / 2,
+      scale: Math.min(0.96, Math.max(0.32, bounds.width / focusWidth)),
+    });
+    setActivePoster(entry);
+  };
+
+  const closeActivePoster = () => {
+    if (!activePoster || posterClosingRef.current) return;
+    posterClosingRef.current = true;
+    setIsPosterClosing(true);
+    posterCloseTimerRef.current = window.setTimeout(() => {
+      setActivePoster(null);
+      setIsPosterClosing(false);
+      posterClosingRef.current = false;
+      posterCloseTimerRef.current = null;
+    }, 420);
+  };
 
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
     const poster = event.currentTarget;
@@ -311,15 +352,21 @@ export default function Home() {
     if (!activePoster) return;
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActivePoster(null);
+      if (event.key === "Escape") closeActivePoster();
     };
+    const focusFrame = window.requestAnimationFrame(() => posterDialogRef.current?.focus());
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
+      window.cancelAnimationFrame(focusFrame);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [activePoster]);
+
+  useEffect(() => () => {
+    if (posterCloseTimerRef.current !== null) window.clearTimeout(posterCloseTimerRef.current);
+  }, []);
 
   useEffect(() => {
     const mount = sceneMountRef.current;
@@ -936,7 +983,7 @@ export default function Home() {
                         aria-label={`Open ${entry.title} poster`}
                         onPointerMove={handlePosterMove}
                         onPointerLeave={resetPosterPose}
-                        onClick={() => setActivePoster(entry)}
+                        onClick={(event) => openPoster(entry, event.currentTarget)}
                       >
                         <span>{entry.marker}</span>
                         <h3>{entry.title}</h3>
@@ -953,28 +1000,26 @@ export default function Home() {
 
       {activePoster && (
         <div
-          className="poster-modal"
+          className={`poster-modal${isPosterClosing ? " is-closing" : ""}`}
           onClick={(event) => {
-            if (event.target === event.currentTarget) setActivePoster(null);
+            if (event.target === event.currentTarget) closeActivePoster();
           }}
         >
           <article
+            ref={posterDialogRef}
             className="poster-focus-card"
             role="dialog"
             aria-modal="true"
             aria-labelledby="poster-focus-title"
+            tabIndex={-1}
+            style={{
+              "--poster-origin-x": `${posterMotion.x}px`,
+              "--poster-origin-y": `${posterMotion.y}px`,
+              "--poster-origin-scale": posterMotion.scale,
+            } as CSSProperties}
             onPointerMove={handlePosterMove}
             onPointerLeave={resetPosterPose}
           >
-            <button
-              type="button"
-              className="poster-close"
-              aria-label="Close poster"
-              onClick={() => setActivePoster(null)}
-              autoFocus
-            >
-              ×
-            </button>
             <span>{activePoster.marker}</span>
             <h3 id="poster-focus-title">{activePoster.title}</h3>
             <p>{activePoster.detail}</p>
