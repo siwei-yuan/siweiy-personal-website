@@ -193,8 +193,8 @@ type DossierSection = {
 
 const dossierSections: readonly DossierSection[] = [
   {
-    id: "experience",
-    label: "Experience",
+    id: "chronology",
+    label: "Chronology",
     entries: [
       {
         marker: "MAY 2026—NOW",
@@ -252,6 +252,15 @@ const dossierSections: readonly DossierSection[] = [
         period: "Jun 2020 — Sep 2020 · 4 mos",
         employment: "Internship",
         location: "Shanghai, China",
+        source: "LinkedIn profile",
+      },
+      {
+        marker: "2019—2023",
+        title: "University of California, Los Angeles",
+        detail: "GPA 3.97/4.00 · Summa Cum Laude · Bruin Space",
+        company: "University of California, Los Angeles",
+        period: "2019 — 2023",
+        employment: "Education",
         source: "LinkedIn profile",
       },
     ],
@@ -1083,7 +1092,7 @@ export default function Home() {
       <main className="scroll-story">
         <section className="hero-spacer" aria-labelledby="site-title">
           <h1 id="site-title" className="sr-only">Siwei Yuan</h1>
-          <a className="scroll-cue" href="#experience" aria-label="Scroll to experience" />
+          <a className="scroll-cue" href="#chronology" aria-label="Scroll to chronology" />
         </section>
 
         {dossierSections.map((section) => (
@@ -1158,7 +1167,7 @@ export default function Home() {
                 onClick={(event) => event.stopPropagation()}
               >
                 <header>
-                  <span>Experience record / extracted sheet</span>
+                  <span>Chronology record / extracted sheet</span>
                   <b>{activePoster.marker}</b>
                 </header>
                 <div className="detail-sheet-body">

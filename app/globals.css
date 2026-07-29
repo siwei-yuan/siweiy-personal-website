@@ -346,7 +346,7 @@ body::selection { background: var(--red); color: #fff; }
   padding: 8px clamp(12px, 3vw, 48px) 18px;
 }
 
-.dossier-section[data-section="experience"] .dossier-records { top: 18vh; }
+.dossier-section[data-section="chronology"] .dossier-records { top: 18vh; }
 
 .records-list.is-expanded {
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -359,6 +359,10 @@ body::selection { background: var(--red); color: #fff; }
 .records-list.is-expanded .poster-anchor { grid-column: span 2; }
 .records-list.is-expanded .poster-anchor:nth-child(4) { grid-column: 2 / span 2; }
 .records-list.is-expanded .poster-anchor:nth-child(5) { grid-column: 4 / span 2; }
+.records-list.is-expanded:has(.poster-anchor:nth-child(6)) .poster-anchor:nth-child(4),
+.records-list.is-expanded:has(.poster-anchor:nth-child(6)) .poster-anchor:nth-child(5) {
+  grid-column: span 2;
+}
 .records-list.is-expanded h3 { font-size: clamp(1.35rem, 1.85vw, 2.4rem); }
 
 .records-list::before {
@@ -857,7 +861,7 @@ html {
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
   .dossier-records,
-  .dossier-section[data-section="experience"] .dossier-records { top: 22vh; left: 16px; right: 16px; }
+  .dossier-section[data-section="chronology"] .dossier-records { top: 22vh; left: 16px; right: 16px; }
   .records-list {
     grid-template-columns: 1fr;
     gap: 34px;
@@ -896,6 +900,11 @@ html {
     grid-column: 1 / -1;
     width: calc(50% - 9px);
     justify-self: center;
+  }
+  .records-list.is-expanded:has(.poster-anchor:nth-child(6)) .poster-anchor:nth-child(5) {
+    grid-column: span 1;
+    width: 100%;
+    justify-self: auto;
   }
   .records-list h3 { font-size: clamp(2.1rem, 10vw, 3.4rem); }
   .records-list.is-expanded h3 { font-size: clamp(1.15rem, 5vw, 1.65rem); }

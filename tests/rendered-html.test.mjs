@@ -24,11 +24,12 @@ test("server-renders the portfolio structure and metadata", async () => {
   const html = await response.text();
   assert.match(html, /<title>Siwei Yuan — Selected Work<\/title>/i);
   assert.match(html, /Siwei Yuan/);
-  assert.match(html, /id="experience"/);
+  assert.match(html, /id="chronology"/);
   assert.match(html, /id="projects"/);
   assert.match(html, /id="blogs"/);
   assert.match(html, /Member of Technical Staff/);
   assert.match(html, /Amazon Web Services/);
+  assert.match(html, /University of California, Los Angeles/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
