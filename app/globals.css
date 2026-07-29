@@ -276,7 +276,7 @@ body::selection { background: var(--red); color: #fff; }
   width: 80vw;
   max-width: 80vw;
   color: var(--blue-white);
-  font-size: clamp(5rem, 13vw, 13rem);
+  font-size: 9.8vw;
   font-weight: 920;
   line-height: .72;
   letter-spacing: 0;
@@ -375,7 +375,6 @@ body::selection { background: var(--red); color: #fff; }
 @media (max-width: 760px) {
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
-  .section-title-hit h2 { font-size: clamp(3.2rem, 14vw, 5.8rem); }
   .dossier-records { top: 25vh; left: 16px; right: 16px; }
   .records-eyebrow { margin-bottom: 24px; }
   .records-list article {
