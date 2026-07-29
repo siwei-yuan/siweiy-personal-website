@@ -312,25 +312,14 @@ body::selection { background: var(--red); color: #fff; }
   will-change: opacity, transform;
 }
 
-.records-eyebrow {
-  width: fit-content;
-  margin: 0 0 clamp(28px, 5vh, 54px);
-  padding: 8px 12px 7px;
-  border-left: 7px solid var(--red);
-  background: var(--blue-white);
-  color: #080a0a;
-  font: 750 clamp(7px, .68vw, 10px)/1 var(--font-geist-mono), monospace;
-  letter-spacing: .17em;
-  text-transform: uppercase;
-}
-
 .records-list {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: clamp(28px, 4.5vw, 72px);
+  grid-template-columns: repeat(3, minmax(0, 23vw));
+  justify-content: space-between;
+  gap: clamp(22px, 3vw, 48px);
   align-items: center;
-  padding: 8px clamp(4px, 1vw, 16px) 18px;
+  padding: 8px clamp(12px, 3vw, 48px) 18px;
 }
 
 .records-list::before {
@@ -371,6 +360,8 @@ body::selection { background: var(--red); color: #fff; }
     repeating-linear-gradient(0deg, rgba(4,7,8,.018) 0, rgba(4,7,8,.018) 1px, transparent 1px, transparent 4px),
     var(--blue-white);
   box-shadow:
+    7px 8px 0 rgba(59, 72, 74, .9),
+    11px 13px 0 rgba(13, 17, 18, .9),
     0 28px 70px rgba(0,0,0,.48),
     0 0 0 1px rgba(0,0,0,.18),
     0 0 38px rgba(155, 187, 191, .065);
@@ -424,7 +415,7 @@ body::selection { background: var(--red); color: #fff; }
 .records-list h3 {
   margin: auto 0 clamp(20px, 2.3vh, 30px);
   color: #060808;
-  font-size: clamp(2rem, 3.25vw, 4.1rem);
+  font-size: clamp(1.8rem, 2.7vw, 3.5rem);
   font-weight: 900;
   line-height: .82;
   letter-spacing: -.07em;
@@ -442,7 +433,6 @@ body::selection { background: var(--red); color: #fff; }
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
   .dossier-records { top: 25vh; left: 16px; right: 16px; }
-  .records-eyebrow { margin-bottom: 24px; }
   .records-list {
     grid-template-columns: 1fr;
     gap: 34px;

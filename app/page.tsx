@@ -169,7 +169,6 @@ const dossierSections = [
   {
     id: "experience",
     label: "Experience",
-    eyebrow: "Personnel record / selected chapters",
     entries: [
       { marker: "2024—NOW", title: "Current Role", detail: "Company · title · territory under control." },
       { marker: "2021—2024", title: "Previous Chapter", detail: "Intervention · consequence · recorded outcome." },
@@ -179,7 +178,6 @@ const dossierSections = [
   {
     id: "projects",
     label: "Projects",
-    eyebrow: "Casework / selected operations",
     entries: [
       { marker: "CASE / A", title: "Untitled Artifact A", detail: "Context · intervention · measurable consequence." },
       { marker: "CASE / B", title: "Untitled Artifact B", detail: "System · failure mode · recovered signal." },
@@ -189,7 +187,6 @@ const dossierSections = [
   {
     id: "blogs",
     label: "Blogs",
-    eyebrow: "Field notes / public transmissions",
     entries: [
       { marker: "NOTE / 01", title: "First Transmission", detail: "Systems · design · technology · unfamiliar territory." },
       { marker: "NOTE / 02", title: "Field Note", detail: "A record of something that should not have worked." },
@@ -238,7 +235,7 @@ function createNameGeometry(label: string) {
 
   // Random sampling removes the hidden grid completely. Natural clustering and
   // gaps become part of the silhouette instead of an artificial dot matrix.
-  for (let attempt = 0; attempt < 32_000; attempt += 1) {
+  for (let attempt = 0; attempt < 38_000; attempt += 1) {
     const x = Math.floor(Math.random() * canvas.width);
     const y = Math.floor(Math.random() * canvas.height);
     const alpha = pixels[(y * canvas.width + x) * 4 + 3];
@@ -517,10 +514,10 @@ export default function Home() {
     );
     const pyramidFrontMaterial = makePointLitFaceMaterial(
       0x070a0b,
-      0x87979a,
-      new THREE.Vector2(-12, 11),
-      8.5,
-      0.12,
+      0x8ca4a8,
+      new THREE.Vector2(-4.8, 5.8),
+      8.8,
+      0.22,
     );
     const pyramidRightMaterial = makePointLitFaceMaterial(
       0x140504,
@@ -868,7 +865,6 @@ export default function Home() {
               </header>
 
               <div className="dossier-records">
-                <p className="records-eyebrow">{section.eyebrow}</p>
                 <div className="records-list">
                   {section.entries.map((entry) => (
                     <article key={entry.title}>
