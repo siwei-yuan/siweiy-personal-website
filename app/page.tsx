@@ -256,7 +256,7 @@ const dossierSections: readonly DossierSection[] = [
       },
       {
         marker: "2019—2023",
-        title: "University of California, Los Angeles",
+        title: "UCLA",
         detail: "GPA 3.97/4.00 · Summa Cum Laude · Bruin Space",
         company: "University of California, Los Angeles",
         period: "2019 — 2023",
@@ -452,15 +452,21 @@ export default function Home() {
   }, [activePoster, isPosterReady]);
 
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
-    const poster = event.currentTarget;
-    const bounds = poster.getBoundingClientRect();
+    const interactionRoot = event.currentTarget;
+    const poster = interactionRoot.matches(".poster-card, .poster-focus-card")
+      ? interactionRoot
+      : interactionRoot.querySelector<HTMLElement>(".poster-card, .poster-focus-card");
+    if (!poster) return;
+    const bounds = interactionRoot.getBoundingClientRect();
     const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
     const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
-    const anchor = poster.closest<HTMLElement>(".poster-anchor");
-    poster.style.setProperty("--poster-follow-x", `${horizontal * 14}px`);
-    poster.style.setProperty("--poster-follow-y", `${vertical * 10}px`);
-    poster.style.setProperty("--poster-tilt-x", `${vertical * -4.2}deg`);
-    poster.style.setProperty("--poster-tilt-y", `${horizontal * 5.2}deg`);
+    const anchor = interactionRoot.matches(".poster-anchor")
+      ? interactionRoot
+      : poster.closest<HTMLElement>(".poster-anchor");
+    poster.style.setProperty("--poster-follow-x", `${horizontal * 10}px`);
+    poster.style.setProperty("--poster-follow-y", `${vertical * 7}px`);
+    poster.style.setProperty("--poster-tilt-x", `${vertical * -3.2}deg`);
+    poster.style.setProperty("--poster-tilt-y", `${horizontal * 3.8}deg`);
     poster.style.setProperty("--poster-light-x", `${(horizontal + 0.5) * 100}%`);
     poster.style.setProperty("--poster-light-y", `${(vertical + 0.5) * 100}%`);
     poster.dataset.pointerLit = "true";
@@ -472,8 +478,14 @@ export default function Home() {
   };
 
   const resetPosterPose = (event: ReactPointerEvent<HTMLElement>) => {
-    const poster = event.currentTarget;
-    const anchor = poster.closest<HTMLElement>(".poster-anchor");
+    const interactionRoot = event.currentTarget;
+    const poster = interactionRoot.matches(".poster-card, .poster-focus-card")
+      ? interactionRoot
+      : interactionRoot.querySelector<HTMLElement>(".poster-card, .poster-focus-card");
+    if (!poster) return;
+    const anchor = interactionRoot.matches(".poster-anchor")
+      ? interactionRoot
+      : poster.closest<HTMLElement>(".poster-anchor");
     poster.style.setProperty("--poster-follow-x", "0px");
     poster.style.setProperty("--poster-follow-y", "0px");
     poster.style.setProperty("--poster-tilt-x", "0deg");
@@ -1116,13 +1128,16 @@ export default function Home() {
               <div className="dossier-records">
                 <div className={`records-list${section.entries.length > 3 ? " is-expanded" : ""}`}>
                   {section.entries.map((entry) => (
-                    <div className="poster-anchor" key={entry.title}>
+                    <div
+                      className="poster-anchor"
+                      key={entry.title}
+                      onPointerMove={handlePosterMove}
+                      onPointerLeave={resetPosterPose}
+                    >
                       <button
                         type="button"
                         className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
                         aria-label={`Open ${entry.title} poster`}
-                        onPointerMove={handlePosterMove}
-                        onPointerLeave={resetPosterPose}
                         onClick={(event) => openPoster(entry, event.currentTarget)}
                       >
                         <span>{entry.marker}</span>
@@ -1144,21 +1159,25 @@ export default function Home() {
           onClick={closeActivePoster}
         >
           <div className="poster-inspection">
-            <article
-              ref={posterDialogRef}
-              className="poster-focus-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="poster-focus-title"
-              tabIndex={-1}
-              onClick={(event) => event.stopPropagation()}
+            <div
+              className="poster-focus-shell"
               onPointerMove={handlePosterMove}
               onPointerLeave={resetPosterPose}
+              onClick={(event) => event.stopPropagation()}
             >
-              <span>{activePoster.marker}</span>
-              <h3 id="poster-focus-title">{activePoster.title}</h3>
-              <p>{activePoster.detail}</p>
-            </article>
+              <article
+                ref={posterDialogRef}
+                className="poster-focus-card"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="poster-focus-title"
+                tabIndex={-1}
+              >
+                <span>{activePoster.marker}</span>
+                <h3 id="poster-focus-title">{activePoster.title}</h3>
+                <p>{activePoster.detail}</p>
+              </article>
+            </div>
 
             {isPosterReady && (activePoster.summary || activePoster.highlights?.length) && (
               <aside
@@ -1166,10 +1185,6 @@ export default function Home() {
                 aria-label={`${activePoster.title} details`}
                 onClick={(event) => event.stopPropagation()}
               >
-                <header>
-                  <span>Chronology record / extracted sheet</span>
-                  <b>{activePoster.marker}</b>
-                </header>
                 <div className="detail-sheet-body">
                   <p className="detail-company">{activePoster.company ?? "Selected record"}</p>
                   <h4>{activePoster.title}</h4>
@@ -1179,7 +1194,7 @@ export default function Home() {
                     {activePoster.location && <><dt>Location</dt><dd>{activePoster.location}</dd></>}
                   </dl>
                   <section>
-                    <span>Field notes</span>
+                    <span>Notes / Details</span>
                     <p>{activePoster.summary}</p>
                     {activePoster.highlights && (
                       <ul>
@@ -1188,10 +1203,6 @@ export default function Home() {
                     )}
                   </section>
                 </div>
-                <footer>
-                  <span>{activePoster.source ?? "Portfolio record"}</span>
-                  <span>Siwei Yuan / personnel archive</span>
-                </footer>
               </aside>
             )}
           </div>

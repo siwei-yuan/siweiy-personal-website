@@ -29,7 +29,7 @@ test("server-renders the portfolio structure and metadata", async () => {
   assert.match(html, /id="blogs"/);
   assert.match(html, /Member of Technical Staff/);
   assert.match(html, /Amazon Web Services/);
-  assert.match(html, /University of California, Los Angeles/);
+  assert.match(html, /Open UCLA poster/);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
@@ -44,6 +44,8 @@ test("keeps the interactive visual local and removes starter artifacts", async (
   assert.match(page, /ShaderMaterial/);
   assert.match(page, /pointermove/);
   assert.match(page, /prefers-reduced-motion/);
+  assert.match(page, /Notes \/ Details/);
+  assert.doesNotMatch(page, /Chronology record \/ extracted sheet|Field notes|personnel archive/i);
   assert.match(layout, /title: "Siwei Yuan — Selected Work"/);
   assert.match(packageJson, /"three"/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
