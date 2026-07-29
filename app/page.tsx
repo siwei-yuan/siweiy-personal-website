@@ -845,7 +845,11 @@ export default function Home() {
             <div className="dossier-sticky">
               <header className="section-title-position">
                 <div className="section-title-hit">
-                  <h2>{section.label}</h2>
+                  <h2 aria-label={section.label}>
+                    {Array.from(section.label).map((character, index) => (
+                      <span key={`${character}-${index}`} aria-hidden="true">{character}</span>
+                    ))}
+                  </h2>
                 </div>
               </header>
 

@@ -269,17 +269,26 @@ body::selection { background: var(--red); color: #fff; }
 .dossier-section.is-title-visible .section-title-hit { opacity: 1; }
 
 .section-title-hit h2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin: 0;
-  max-width: 100%;
+  width: 80vw;
+  max-width: 80vw;
   color: var(--blue-white);
-  font-size: clamp(5rem, 15.2vw, 14.8rem);
+  font-size: clamp(5rem, 13vw, 13rem);
   font-weight: 920;
   line-height: .72;
-  letter-spacing: -.082em;
+  letter-spacing: 0;
   text-align: center;
   text-transform: uppercase;
   white-space: nowrap;
   text-shadow: 0 0 24px rgba(180,209,214,.08);
+}
+
+.section-title-hit h2 span {
+  display: block;
+  flex: 0 0 auto;
 }
 
 .dossier-section.is-title-visible .section-title-hit h2 {
@@ -287,7 +296,7 @@ body::selection { background: var(--red); color: #fff; }
 }
 
 @keyframes title-impact {
-  0% { opacity: 0; transform: scale(.78, 1.32); filter: blur(13px); letter-spacing: -.13em; }
+  0% { opacity: 0; transform: scale(.78, 1.32); filter: blur(13px); }
   55% { opacity: 1; transform: scale(1.035, .96); filter: blur(0); }
   100% { opacity: 1; transform: scale(1); filter: blur(0); }
 }
@@ -366,7 +375,7 @@ body::selection { background: var(--red); color: #fff; }
 @media (max-width: 760px) {
   .hero-spacer { min-height: 105svh; }
   .dossier-section { min-height: 230svh; }
-  .section-title-hit h2 { font-size: clamp(3.4rem, 16.2vw, 6rem); letter-spacing: -.075em; }
+  .section-title-hit h2 { font-size: clamp(3.2rem, 14vw, 5.8rem); }
   .dossier-records { top: 25vh; left: 16px; right: 16px; }
   .records-eyebrow { margin-bottom: 24px; }
   .records-list article {
