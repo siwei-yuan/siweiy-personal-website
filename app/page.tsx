@@ -15,10 +15,12 @@ const nameVertexShader = /* glsl */ `
   attribute float aMotion;
   attribute float aSpeed;
   attribute float aSize;
+  attribute vec3 aFinalPosition;
   uniform float uTime;
   uniform vec2 uPointer;
   uniform float uPulse;
   uniform float uExit;
+  uniform float uFinale;
   varying float vSeed;
   varying float vEnergy;
   varying float vLens;
@@ -115,6 +117,18 @@ const nameVertexShader = /* glsl */ `
     p.xy += direction * ring * 0.33;
     p.z += ring * 0.75;
 
+    // At the final section, the dispersed name returns as three compact social
+    // marks. Each point keeps a tiny independent drift so the icons remain
+    // living constellations rather than becoming static raster art.
+    float finale = uFinale * uFinale * (3.0 - 2.0 * uFinale);
+    vec3 finaleTarget = aFinalPosition;
+    finaleTarget.xy += vec2(
+      sin(uTime * (0.34 + aSpeed * 0.4) + aSeed * 101.0),
+      cos(uTime * (0.29 + aSpeed * 0.35) + aSeed * 79.0)
+    ) * (0.012 + aMotion * 0.032);
+    finaleTarget.z += sin(uTime * 0.41 + aSeed * 61.0) * 0.025;
+    p = mix(p, finaleTarget, finale);
+
     vec4 viewPosition = modelViewMatrix * vec4(p, 1.0);
     gl_Position = projectionMatrix * viewPosition;
     float glowParticle = step(0.925, aSeed);
@@ -141,6 +155,7 @@ const nameFragmentShader = /* glsl */ `
   precision highp float;
   uniform float uFade;
   uniform float uExit;
+  uniform float uFinale;
   varying float vSeed;
   varying float vEnergy;
   varying float vLens;
@@ -166,7 +181,9 @@ const nameFragmentShader = /* glsl */ `
     alpha += circle * vEdge * 0.1;
     alpha += softGlow * vGlow * 0.76;
     alpha += softGlow * vFlare * 1.05;
-    alpha *= uFade * (1.0 - uExit);
+    float finale = uFinale * uFinale * (3.0 - 2.0 * uFinale);
+    float visibility = mix(max(1.0 - uExit, 0.0), 1.0, finale);
+    alpha *= uFade * visibility;
     if (alpha < 0.02) discard;
     gl_FragColor = vec4(color, alpha);
   }
@@ -183,6 +200,9 @@ type PosterEntry = {
   summary?: string;
   highlights?: readonly string[];
   source?: string;
+  status?: string;
+  stack?: string;
+  href?: string;
 };
 
 type DossierSection = {
@@ -239,6 +259,8 @@ const dossierSections: readonly DossierSection[] = [
         period: "Jun 2022 — Sep 2022 · 4 mos",
         employment: "Internship",
         location: "Seattle, Washington, United States · On-site",
+        summary: "Built:",
+        highlights: ["A telemetry system for the AWS NVMe driver"],
         source: "LinkedIn profile",
       },
       {
@@ -249,6 +271,11 @@ const dossierSections: readonly DossierSection[] = [
         period: "Jan 2021 — Sep 2021 · 9 mos",
         employment: "Internship",
         location: "Shanghai, China",
+        summary: "Worked on:",
+        highlights: [
+          "VM-related internal tools",
+          "QA for VxRail releases",
+        ],
         source: "LinkedIn profile",
       },
       {
@@ -276,18 +303,58 @@ const dossierSections: readonly DossierSection[] = [
     id: "projects",
     label: "Projects",
     entries: [
-      { marker: "CASE / A", title: "Untitled Artifact A", detail: "Context · intervention · measurable consequence." },
-      { marker: "CASE / B", title: "Untitled Artifact B", detail: "System · failure mode · recovered signal." },
-      { marker: "CASE / C", title: "Untitled Artifact C", detail: "Prototype · deployment · observed effect." },
+      {
+        marker: "OPEN SOURCE / 01",
+        title: "KeyTally",
+        detail: "AI telemetry · QMK/VIA · macOS",
+        company: "The tally light for your AI",
+        status: "Public · Open Source",
+        stack: "Tauri 2 · Rust · QMK",
+        summary: "Turns AI usage, quota burn, and live activity into keyboard light.",
+        highlights: [
+          "Claude Code and Codex usage modes",
+          "Universal VIA mode with no firmware flashing",
+          "Pro QMK firmware with per-LED roles",
+        ],
+        href: "https://github.com/siwei-yuan/keytally",
+      },
+      {
+        marker: "OPEN SOURCE / 02",
+        title: "Bili Pilot",
+        detail: "CDN routing · DASH pre-cache · Chrome",
+        company: "Stable high-bitrate Bilibili playback",
+        status: "Public · Experimental",
+        stack: "Chrome Extension · JavaScript · DASH",
+        summary: "Compares signed CDN routes and pre-caches complete upcoming DASH segments.",
+        highlights: [
+          "Manual signed-route selection",
+          "Adaptive per-segment pre-cache",
+          "Local, private, and fail-open delivery",
+        ],
+        href: "https://github.com/siwei-yuan/bili-pilot",
+      },
+      {
+        marker: "OPEN SOURCE / 03",
+        title: "Aperture",
+        detail: "Agent privacy · ReBAC · disclosure ledger",
+        company: "Disclosure control for personal AI agents",
+        status: "Public · Open Source",
+        stack: "TypeScript · Memory Authorization · Ledger",
+        summary: "Determines which resolution of a memory each person may access before model context is built.",
+        highlights: [
+          "Resolution-typed memory authorization",
+          "Quarantined ingest and audience ceilings",
+          "Append-only disclosure ledger",
+        ],
+        href: "https://github.com/siwei-yuan/aperture",
+      },
     ],
   },
   {
     id: "blogs",
     label: "Blogs",
     entries: [
-      { marker: "NOTE / 01", title: "First Transmission", detail: "Systems · design · technology · unfamiliar territory." },
-      { marker: "NOTE / 02", title: "Field Note", detail: "A record of something that should not have worked." },
-      { marker: "NOTE / 03", title: "Observation", detail: "Methods for looking directly at strange systems." },
+      { marker: "TRANSMISSION PENDING", title: "Coming Soon", detail: "Notes from unfamiliar systems." },
     ],
   },
 ];
@@ -334,6 +401,7 @@ function createNameGeometry(label: string) {
   const motions: number[] = [];
   const speeds: number[] = [];
   const sizes: number[] = [];
+  const finalPositions: number[] = [];
 
   // Random sampling removes the hidden grid completely. Natural clustering and
   // gaps become part of the silhouette instead of an artificial dot matrix.
@@ -354,11 +422,80 @@ function createNameGeometry(label: string) {
     }
   }
 
+  // Build a second mask for the three closing social marks. The canonical DOM
+  // icons remain the interactive layer; these targets make the original name
+  // particles physically return and gather around the same three positions.
+  canvas.width = 1500;
+  canvas.height = 360;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#ffffff";
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 20;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  const socialCenters = [300, 750, 1200];
+  const socialY = canvas.height / 2;
+
+  // LinkedIn: compact outlined tile and its familiar lowercase mark.
+  context.strokeRect(socialCenters[0] - 66, socialY - 66, 132, 132);
+  context.font = '800 92px Arial, sans-serif';
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText("in", socialCenters[0] + 4, socialY + 9);
+
+  // GitHub: a minimal cat-head silhouette, backed by the canonical DOM icon.
+  context.beginPath();
+  context.arc(socialCenters[1], socialY + 10, 55, 0, Math.PI * 2);
+  context.fill();
+  context.beginPath();
+  context.moveTo(socialCenters[1] - 48, socialY - 22);
+  context.lineTo(socialCenters[1] - 63, socialY - 70);
+  context.lineTo(socialCenters[1] - 16, socialY - 48);
+  context.closePath();
+  context.fill();
+  context.beginPath();
+  context.moveTo(socialCenters[1] + 48, socialY - 22);
+  context.lineTo(socialCenters[1] + 63, socialY - 70);
+  context.lineTo(socialCenters[1] + 16, socialY - 48);
+  context.closePath();
+  context.fill();
+
+  // X: two structural strokes rather than another block of typography.
+  context.beginPath();
+  context.moveTo(socialCenters[2] - 56, socialY - 64);
+  context.lineTo(socialCenters[2] + 56, socialY + 64);
+  context.moveTo(socialCenters[2] + 50, socialY - 64);
+  context.lineTo(socialCenters[2] + 4, socialY - 12);
+  context.stroke();
+
+  const socialPixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const particleCount = positions.length / 3;
+  for (let particle = 0; particle < particleCount; particle += 1) {
+    const group = particle % socialCenters.length;
+    let x = socialCenters[group];
+    let y = socialY;
+    for (let attempt = 0; attempt < 600; attempt += 1) {
+      const candidateX = Math.floor(socialCenters[group] - 86 + Math.random() * 172);
+      const candidateY = Math.floor(socialY - 86 + Math.random() * 172);
+      if (socialPixels[(candidateY * canvas.width + candidateX) * 4 + 3] > 96) {
+        x = candidateX;
+        y = candidateY;
+        break;
+      }
+    }
+    finalPositions.push(
+      ((x - canvas.width / 2) / canvas.width) * 10.5,
+      (-(y - canvas.height / 2) / canvas.height) * 2.7,
+      (Math.random() - 0.5) * 0.18,
+    );
+  }
+
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("aSeed", new THREE.Float32BufferAttribute(seeds, 1));
   geometry.setAttribute("aMotion", new THREE.Float32BufferAttribute(motions, 1));
   geometry.setAttribute("aSpeed", new THREE.Float32BufferAttribute(speeds, 1));
   geometry.setAttribute("aSize", new THREE.Float32BufferAttribute(sizes, 1));
+  geometry.setAttribute("aFinalPosition", new THREE.Float32BufferAttribute(finalPositions, 3));
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -923,6 +1060,7 @@ export default function Home() {
         uPulse: { value: 0 },
         uFade: { value: 1 },
         uExit: { value: 0 },
+        uFinale: { value: 0 },
       },
     });
     const namePoints = new THREE.Points(nameGeometry, nameMaterial);
@@ -975,6 +1113,8 @@ export default function Home() {
     window.addEventListener("resize", resize);
     resize();
 
+    const finaleSection = document.querySelector<HTMLElement>(".social-finale");
+    let targetFinale = 0;
     let targetScroll = window.scrollY;
     const updateScrollStory = () => {
       targetScroll = window.scrollY;
@@ -994,6 +1134,13 @@ export default function Home() {
           titleVisible,
         );
       });
+      if (finaleSection) {
+        const rect = finaleSection.getBoundingClientRect();
+        const travel = Math.max(finaleSection.offsetHeight - viewportHeight, 1);
+        targetFinale = THREE.MathUtils.clamp(-rect.top / travel, 0, 1);
+        finaleSection.style.setProperty("--finale-progress", targetFinale.toFixed(4));
+        finaleSection.classList.toggle("is-social-active", targetFinale > 0.68);
+      }
     };
     window.addEventListener("scroll", updateScrollStory, { passive: true });
     updateScrollStory();
@@ -1004,11 +1151,13 @@ export default function Home() {
     const idleCameraTarget = new THREE.Vector3();
     const idleLookAtTarget = new THREE.Vector3();
     let currentScroll = targetScroll;
+    let currentFinale = targetFinale;
     let animationFrame = 0;
     const animate = (timestamp: number) => {
       const elapsed = reduceMotion ? 0 : (timestamp - startTime) / 1000;
       currentPointer.lerp(targetPointer, reduceMotion ? 1 : 0.045);
       currentScroll = THREE.MathUtils.lerp(currentScroll, targetScroll, reduceMotion ? 1 : 0.075);
+      currentFinale = THREE.MathUtils.lerp(currentFinale, targetFinale, reduceMotion ? 1 : 0.065);
       const rawCollapse = THREE.MathUtils.clamp(
         (currentScroll / Math.max(window.innerHeight, 1) - 0.06) / 0.78,
         0,
@@ -1052,13 +1201,22 @@ export default function Home() {
       currentLookAt.lerp(idleLookAtTarget, reduceMotion ? 1 : 0.055);
       camera.lookAt(currentLookAt);
 
-      namePoints.rotation.y = THREE.MathUtils.lerp(namePoints.rotation.y, currentPointer.x * 0.035, 0.06);
-      namePoints.rotation.x = THREE.MathUtils.lerp(namePoints.rotation.x, currentPointer.y * -0.018, 0.06);
+      namePoints.rotation.y = THREE.MathUtils.lerp(
+        namePoints.rotation.y,
+        currentPointer.x * 0.035 * (1 - currentFinale),
+        0.06,
+      );
+      namePoints.rotation.x = THREE.MathUtils.lerp(
+        namePoints.rotation.x,
+        currentPointer.y * -0.018 * (1 - currentFinale),
+        0.06,
+      );
       nameMaterial.uniforms.uTime.value = elapsed;
       nameMaterial.uniforms.uPointer.value.copy(pointerActive ? currentPointer : restingNamePointer);
       pulseRef.current *= reduceMotion ? 0.7 : 0.935;
       nameMaterial.uniforms.uPulse.value = pulseRef.current;
       nameMaterial.uniforms.uExit.value = collapse;
+      nameMaterial.uniforms.uFinale.value = currentFinale;
       nameMaterial.uniforms.uFade.value = 1;
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
@@ -1145,6 +1303,7 @@ export default function Home() {
                         type="button"
                         className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
                         data-title-density={getPosterTitleDensity(entry.title)}
+                        data-linked={entry.href ? "true" : undefined}
                         aria-label={`Open ${entry.title} poster`}
                         onClick={(event) => openPoster(entry, event.currentTarget)}
                       >
@@ -1159,6 +1318,36 @@ export default function Home() {
             </div>
           </section>
         ))}
+
+        <section className="social-finale" aria-label="Social profiles">
+          <div className="social-finale-sticky">
+            <nav className="social-links" aria-label="Elsewhere">
+              <a
+                className="social-link"
+                data-network="linkedin"
+                href="https://www.linkedin.com/in/siwei-yuan/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="LinkedIn"
+              ><span>LinkedIn</span></a>
+              <a
+                className="social-link"
+                data-network="github"
+                href="https://github.com/siwei-yuan"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub"
+              ><span>GitHub</span></a>
+              <span
+                className="social-link is-disabled"
+                data-network="x"
+                aria-label="X profile link pending"
+                aria-disabled="true"
+                title="X profile link pending"
+              ><span>X</span></span>
+            </nav>
+          </div>
+        </section>
       </main>
 
       {activePoster && (
@@ -1198,11 +1387,15 @@ export default function Home() {
                 <div className="detail-sheet-body">
                   <p className="detail-company">{activePoster.company ?? "Selected record"}</p>
                   <h4>{activePoster.title}</h4>
-                  <dl>
-                    {activePoster.period && <><dt>Period</dt><dd>{activePoster.period}</dd></>}
-                    {activePoster.employment && <><dt>Type</dt><dd>{activePoster.employment}</dd></>}
-                    {activePoster.location && <><dt>Location</dt><dd>{activePoster.location}</dd></>}
-                  </dl>
+                  {(activePoster.period || activePoster.employment || activePoster.location || activePoster.status || activePoster.stack) && (
+                    <dl>
+                      {activePoster.period && <><dt>Period</dt><dd>{activePoster.period}</dd></>}
+                      {activePoster.employment && <><dt>Type</dt><dd>{activePoster.employment}</dd></>}
+                      {activePoster.location && <><dt>Location</dt><dd>{activePoster.location}</dd></>}
+                      {activePoster.status && <><dt>Status</dt><dd>{activePoster.status}</dd></>}
+                      {activePoster.stack && <><dt>System</dt><dd>{activePoster.stack}</dd></>}
+                    </dl>
+                  )}
                   <section>
                     <span>Notes / Details</span>
                     <p>{activePoster.summary}</p>
@@ -1212,6 +1405,14 @@ export default function Home() {
                       </ul>
                     )}
                   </section>
+                  {activePoster.href && (
+                    <a
+                      className="detail-project-link"
+                      href={activePoster.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >View repository <span aria-hidden="true">↗</span></a>
+                  )}
                 </div>
               </aside>
             )}
