@@ -290,7 +290,7 @@ export default function Home() {
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.84;
+    renderer.toneMappingExposure = 0.98;
     renderer.shadowMap.enabled = !compact;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.55));
@@ -423,8 +423,8 @@ export default function Home() {
           float centreLift = 1.0 - smoothstep(0.0, 0.72, distance(vUv, vec2(0.5, 0.48)));
           float lowerShade = smoothstep(0.0, 0.46, vUv.y);
           float centralJoint = exp(-pow((vUv.x - 0.5) / 0.0024, 2.0));
-          vec3 color = mix(vec3(0.006, 0.008, 0.008), vec3(0.027, 0.032, 0.033), centreLift);
-          color *= mix(0.78, 1.0, lowerShade);
+          vec3 color = mix(vec3(0.011, 0.013, 0.013), vec3(0.043, 0.05, 0.051), centreLift);
+          color *= mix(0.86, 1.0, lowerShade);
           color += vec3(0.009, 0.012, 0.012) * centralJoint * 0.12;
           gl_FragColor = vec4(color, 1.0);
         }
