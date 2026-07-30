@@ -16,7 +16,7 @@ import {
   type PosterEntry,
 } from "./content";
 
-const SCROLL_RAIL_TICKS = Array.from({ length: 58 });
+const SCROLL_RAIL_TICKS = Array.from({ length: 21 });
 
 const nameVertexShader = /* glsl */ `
   attribute float aSeed;
@@ -363,6 +363,7 @@ export default function Home() {
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorLightRef = useRef<HTMLDivElement>(null);
   const scrollRailRef = useRef<HTMLDivElement>(null);
+  const scrollTickRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const posterDialogRef = useRef<HTMLElement>(null);
   const posterSourceRef = useRef<HTMLButtonElement | null>(null);
   const posterCloseTimerRef = useRef<number | null>(null);
@@ -394,6 +395,8 @@ export default function Home() {
       ? document.querySelector<HTMLElement>(".poster-modal")
       : null;
 
+    let animationFrame = 0;
+
     const updateRail = () => {
       const position = modal ? modal.scrollTop : window.scrollY;
       const scrollHeight = modal
@@ -401,30 +404,65 @@ export default function Home() {
         : document.documentElement.scrollHeight;
       const viewportHeight = modal ? modal.clientHeight : window.innerHeight;
       const maximum = Math.max(scrollHeight - viewportHeight, 0);
-      const progress = maximum > 0 ? Math.min(Math.max(position / maximum, 0), 1) : 0;
-      const thumbTravel = Math.max(rail.clientHeight - 66, 0);
+      const normalizedProgress = maximum > 0
+        ? Math.min(Math.max(position / maximum, 0), 1)
+        : 0;
+      const progress = position <= 1
+        ? 0
+        : maximum - position <= 1
+          ? 1
+          : normalizedProgress;
+      const ticks = scrollTickRefs.current;
+      const finalTick = Math.max(ticks.length - 1, 0);
+      const activeTick = progress * finalTick;
+      const maximumWidth = rail.clientWidth;
+      const restingWidth = Math.min(7, maximumWidth * .3);
 
-      rail.style.setProperty("--scroll-thumb-y", `${progress * thumbTravel}px`);
+      ticks.forEach((tick, index) => {
+        if (!tick) return;
+        const distance = Math.abs(index - activeTick);
+        const intensity = Math.exp(-Math.pow(distance / 2.35, 2));
+        const width = restingWidth + (maximumWidth - restingWidth) * intensity;
+        const opacity = .16 + intensity * .79;
+        const tone = Math.round(170 + intensity * 72);
+
+        tick.style.setProperty("--tick-width", `${width.toFixed(2)}px`);
+        tick.style.setProperty("--tick-opacity", opacity.toFixed(3));
+        tick.style.setProperty("--tick-color", `rgb(${tone} ${Math.min(tone + 6, 248)} ${Math.min(tone + 4, 246)})`);
+        tick.style.setProperty(
+          "--tick-glow",
+          intensity > .72 ? `0 0 ${Math.round(4 + intensity * 7)}px rgba(225, 236, 234, ${(intensity * .2).toFixed(3)})` : "none",
+        );
+      });
+
       rail.classList.toggle("is-static", maximum <= 1);
     };
 
-    if (modal) modal.addEventListener("scroll", updateRail, { passive: true });
-    else window.addEventListener("scroll", updateRail, { passive: true });
-    window.addEventListener("resize", updateRail);
+    const scheduleRailUpdate = () => {
+      if (animationFrame) return;
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = 0;
+        updateRail();
+      });
+    };
 
-    const resizeObserver = new ResizeObserver(updateRail);
+    if (modal) modal.addEventListener("scroll", scheduleRailUpdate, { passive: true });
+    else window.addEventListener("scroll", scheduleRailUpdate, { passive: true });
+    window.addEventListener("resize", scheduleRailUpdate);
+
+    const resizeObserver = new ResizeObserver(scheduleRailUpdate);
     resizeObserver.observe(modal ?? document.documentElement);
     const inspection = modal?.querySelector<HTMLElement>(".poster-inspection");
     if (inspection) resizeObserver.observe(inspection);
 
-    const animationFrame = window.requestAnimationFrame(updateRail);
+    scheduleRailUpdate();
 
     return () => {
-      if (modal) modal.removeEventListener("scroll", updateRail);
-      else window.removeEventListener("scroll", updateRail);
-      window.removeEventListener("resize", updateRail);
+      if (modal) modal.removeEventListener("scroll", scheduleRailUpdate);
+      else window.removeEventListener("scroll", scheduleRailUpdate);
+      window.removeEventListener("resize", scheduleRailUpdate);
       resizeObserver.disconnect();
-      window.cancelAnimationFrame(animationFrame);
+      if (animationFrame) window.cancelAnimationFrame(animationFrame);
     };
   }, [activePoster, isPosterReady]);
 
@@ -1215,10 +1253,12 @@ export default function Home() {
       <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
       <div ref={scrollRailRef} className="scroll-rail" aria-hidden="true">
         <div className="scroll-rail-track">
-          {SCROLL_RAIL_TICKS.map((_, index) => <span key={index} />)}
-        </div>
-        <div className="scroll-rail-thumb">
-          {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+          {SCROLL_RAIL_TICKS.map((_, index) => (
+            <span
+              key={index}
+              ref={(node) => { scrollTickRefs.current[index] = node; }}
+            />
+          ))}
         </div>
       </div>
 
