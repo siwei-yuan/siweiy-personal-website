@@ -163,6 +163,10 @@ export const dossierSections: readonly DossierSection[] = [
   },
 ];
 
+export const projectScreenshotUrls = dossierSections.flatMap((section) =>
+  section.entries.flatMap((entry) => entry.screenshot ? [entry.screenshot] : []),
+);
+
 export function getPosterTitleDensity(title: string) {
   const longestWord = Math.max(...title.split(/\s+/).map((word) => word.length));
   if (longestWord >= 11 || title.length >= 32) return "compressed";

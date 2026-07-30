@@ -17,6 +17,8 @@ test("exports the complete portfolio as static HTML", async () => {
   assert.match(html, /Open UCLA poster/);
   assert.match(html, /href="https:\/\/www\.linkedin\.com\/in\/siwei-yuan\/"/);
   assert.match(html, /href="https:\/\/x\.com\/ysw_Jerry"/);
+  assert.match(html, /rel="preload"[^>]+keytally[^>]+as="image"/i);
+  assert.match(html, /rel="preload"[^>]+bili-pilot[^>]+as="image"/i);
   assert.doesNotMatch(html, /codex-preview|Building your site|react-loading-skeleton/i);
 });
 
@@ -31,6 +33,8 @@ test("keeps the interactive visual and accessible content in the source", async 
   assert.match(page, /ShaderMaterial/);
   assert.match(page, /pointermove/);
   assert.match(page, /prefers-reduced-motion/);
+  assert.match(page, /scroll-rail/);
+  assert.match(page, /projectScreenshotUrls/);
   assert.match(page, /Notes \/ Details/);
   assert.doesNotMatch(page, /Chronology record \/ extracted sheet|Field notes|personnel archive/i);
   assert.match(layout, /title: "Siwei Yuan — Selected Work"/);

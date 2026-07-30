@@ -7,13 +7,16 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { flushSync } from "react-dom";
+import { flushSync, preload } from "react-dom";
 import * as THREE from "three";
 import {
   dossierSections,
   getPosterTitleDensity,
+  projectScreenshotUrls,
   type PosterEntry,
 } from "./content";
+
+const SCROLL_RAIL_TICKS = Array.from({ length: 58 });
 
 const nameVertexShader = /* glsl */ `
   attribute float aSeed;
@@ -354,9 +357,12 @@ function createNameGeometry(label: string) {
 }
 
 export default function Home() {
+  projectScreenshotUrls.forEach((src) => preload(src, { as: "image" }));
+
   const sceneMountRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const cursorLightRef = useRef<HTMLDivElement>(null);
+  const scrollRailRef = useRef<HTMLDivElement>(null);
   const posterDialogRef = useRef<HTMLElement>(null);
   const posterSourceRef = useRef<HTMLButtonElement | null>(null);
   const posterCloseTimerRef = useRef<number | null>(null);
@@ -365,6 +371,62 @@ export default function Home() {
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
   const [isPosterReady, setIsPosterReady] = useState(false);
   const [isPosterClosing, setIsPosterClosing] = useState(false);
+
+  useEffect(() => {
+    const decodedImages = projectScreenshotUrls.map((src) => {
+      const image = new Image();
+      image.decoding = "async";
+      image.src = src;
+      void image.decode?.().catch(() => undefined);
+      return image;
+    });
+
+    return () => {
+      decodedImages.forEach((image) => image.removeAttribute("src"));
+    };
+  }, []);
+
+  useEffect(() => {
+    const rail = scrollRailRef.current;
+    if (!rail) return;
+
+    const modal = activePoster
+      ? document.querySelector<HTMLElement>(".poster-modal")
+      : null;
+
+    const updateRail = () => {
+      const position = modal ? modal.scrollTop : window.scrollY;
+      const scrollHeight = modal
+        ? modal.scrollHeight
+        : document.documentElement.scrollHeight;
+      const viewportHeight = modal ? modal.clientHeight : window.innerHeight;
+      const maximum = Math.max(scrollHeight - viewportHeight, 0);
+      const progress = maximum > 0 ? Math.min(Math.max(position / maximum, 0), 1) : 0;
+      const thumbTravel = Math.max(rail.clientHeight - 66, 0);
+
+      rail.style.setProperty("--scroll-thumb-y", `${progress * thumbTravel}px`);
+      rail.classList.toggle("is-static", maximum <= 1);
+    };
+
+    if (modal) modal.addEventListener("scroll", updateRail, { passive: true });
+    else window.addEventListener("scroll", updateRail, { passive: true });
+    window.addEventListener("resize", updateRail);
+
+    const resizeObserver = new ResizeObserver(updateRail);
+    resizeObserver.observe(modal ?? document.documentElement);
+    const inspection = modal?.querySelector<HTMLElement>(".poster-inspection");
+    if (inspection) resizeObserver.observe(inspection);
+
+    const animationFrame = window.requestAnimationFrame(updateRail);
+
+    return () => {
+      if (modal) modal.removeEventListener("scroll", updateRail);
+      else window.removeEventListener("scroll", updateRail);
+      window.removeEventListener("resize", updateRail);
+      resizeObserver.disconnect();
+      window.cancelAnimationFrame(animationFrame);
+    };
+  }, [activePoster, isPosterReady]);
 
   const openPoster = async (entry: PosterEntry, source: HTMLButtonElement) => {
     if (activePoster || posterClosingRef.current) return;
@@ -1151,6 +1213,14 @@ export default function Home() {
       <div ref={cursorLightRef} className="cursor-light-field" aria-hidden="true" />
       <div className="film-grain" aria-hidden="true" />
       <div ref={cursorRef} className="cursor-singularity" aria-hidden="true"><span /></div>
+      <div ref={scrollRailRef} className="scroll-rail" aria-hidden="true">
+        <div className="scroll-rail-track">
+          {SCROLL_RAIL_TICKS.map((_, index) => <span key={index} />)}
+        </div>
+        <div className="scroll-rail-thumb">
+          {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+        </div>
+      </div>
 
       <main className="scroll-story">
         <section className="hero-spacer" aria-labelledby="site-title">

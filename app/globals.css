@@ -14,6 +14,17 @@
 html {
   background: var(--black);
   scroll-behavior: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+.poster-modal::-webkit-scrollbar,
+.poster-detail-sheet::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 body {
@@ -62,6 +73,10 @@ body::selection { background: var(--red); color: #fff; }
 .site-shell.poster-is-open > .atmosphere,
 .site-shell.poster-is-open > .scroll-story {
   filter: blur(18px) brightness(.48) saturate(.72);
+}
+
+.site-shell.poster-is-open .cursor-singularity {
+  mix-blend-mode: difference;
 }
 
 .three-scene {
@@ -235,6 +250,79 @@ body::selection { background: var(--red); color: #fff; }
   height: 4px;
   background: #000;
   box-shadow: none;
+}
+
+.scroll-rail {
+  --scroll-thumb-y: 0px;
+  position: fixed;
+  top: 24px;
+  right: 15px;
+  z-index: 96;
+  width: 44px;
+  height: calc(100svh - 48px);
+  pointer-events: none;
+  opacity: .82;
+  transition: opacity 220ms ease;
+  will-change: opacity;
+}
+
+.scroll-rail-track {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.scroll-rail-track span {
+  width: 10px;
+  height: 3px;
+  flex: 0 0 3px;
+  background: rgba(177, 188, 187, .31);
+}
+
+.scroll-rail-track span:nth-child(4n + 1) { opacity: .62; }
+.scroll-rail-track span:nth-child(5n + 2) { opacity: .78; }
+.scroll-rail-track span:nth-child(7n + 3) { opacity: .44; }
+
+.scroll-rail-thumb {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  width: 44px;
+  height: 66px;
+  transform: translate3d(0, var(--scroll-thumb-y), 0);
+  transition: transform 70ms linear;
+  will-change: transform;
+}
+
+.scroll-rail-thumb span {
+  height: 3px;
+  flex: 0 0 3px;
+  background: rgba(189, 199, 198, .58);
+}
+
+.scroll-rail-thumb span:nth-child(1),
+.scroll-rail-thumb span:nth-child(7) { width: 13px; opacity: .48; }
+.scroll-rail-thumb span:nth-child(2),
+.scroll-rail-thumb span:nth-child(6) { width: 22px; opacity: .62; }
+.scroll-rail-thumb span:nth-child(3),
+.scroll-rail-thumb span:nth-child(5) { width: 33px; opacity: .78; }
+.scroll-rail-thumb span:nth-child(4) {
+  width: 44px;
+  background: rgba(240, 245, 243, .98);
+  box-shadow: 0 0 10px rgba(221, 233, 231, .22);
+}
+
+.scroll-rail.is-static { opacity: .22; }
+
+.site-shell.poster-is-open .scroll-rail {
+  mix-blend-mode: difference;
 }
 
 @media (pointer: fine) {
@@ -685,6 +773,8 @@ body::selection { background: var(--red); color: #fff; }
   place-items: center;
   padding: 5vh 5vw;
   background: transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .poster-inspection {
@@ -772,6 +862,8 @@ body::selection { background: var(--red); color: #fff; }
   clip-path: inset(0 100% 0 0);
   transform: translate3d(-18px, 0, 0);
   transform-origin: 0 50%;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .poster-modal.is-ready .poster-detail-sheet {
@@ -1083,6 +1175,18 @@ html {
 }
 
 @media (max-width: 760px) {
+  .scroll-rail {
+    top: 16px;
+    right: 6px;
+    width: 28px;
+    height: calc(100svh - 32px);
+  }
+
+  .scroll-rail-thumb { width: 28px; }
+  .scroll-rail-thumb span:nth-child(3),
+  .scroll-rail-thumb span:nth-child(5) { width: 24px; }
+  .scroll-rail-thumb span:nth-child(4) { width: 28px; }
+
   .hero-spacer { min-height: 105svh; }
 
   /* Mobile sections are a real document flow, not a cropped desktop stage. */
