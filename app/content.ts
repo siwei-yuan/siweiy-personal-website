@@ -13,6 +13,8 @@ export type PosterEntry = {
   screenshot?: string;
   screenshotAlt?: string;
   screenshotOrientation?: "landscape" | "portrait";
+  articleHref?: string;
+  readTime?: string;
 };
 
 export type DossierSection = {
@@ -155,9 +157,11 @@ export const dossierSections: readonly DossierSection[] = [
     label: "Blogs",
     entries: [
       {
-        marker: "TRANSMISSION PENDING",
-        title: "Coming Soon",
-        detail: "Notes from unfamiliar systems.",
+        marker: "FIELD NOTE / 001",
+        title: "Building Coral",
+        detail: "Agent swarm",
+        articleHref: "blog/building-coral/",
+        readTime: "25 min read",
       },
     ],
   },

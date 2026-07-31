@@ -1295,17 +1295,31 @@ export default function Home() {
                       onPointerMove={handlePosterMove}
                       onPointerLeave={resetPosterPose}
                     >
-                      <button
-                        type="button"
-                        className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
-                        data-title-density={getPosterTitleDensity(entry.title)}
-                        aria-label={`Open ${entry.title} poster`}
-                        onClick={(event) => openPoster(entry, event.currentTarget)}
-                      >
-                        <span>{entry.marker}</span>
-                        <h3>{entry.title}</h3>
-                        <p>{entry.detail}</p>
-                      </button>
+                      {entry.articleHref ? (
+                        <a
+                          className="poster-card blog-poster-card"
+                          data-title-density={getPosterTitleDensity(entry.title)}
+                          href={entry.articleHref}
+                          aria-label={`Read ${entry.title}`}
+                        >
+                          <span>{entry.marker}</span>
+                          <h3>{entry.title}</h3>
+                          <p>{entry.detail}</p>
+                          <small>{entry.readTime}</small>
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          className={`poster-card${activePoster === entry ? " is-poster-source" : ""}`}
+                          data-title-density={getPosterTitleDensity(entry.title)}
+                          aria-label={`Open ${entry.title} poster`}
+                          onClick={(event) => openPoster(entry, event.currentTarget)}
+                        >
+                          <span>{entry.marker}</span>
+                          <h3>{entry.title}</h3>
+                          <p>{entry.detail}</p>
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
