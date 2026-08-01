@@ -169,6 +169,8 @@ Most activity inside the swarm starts with a Communication and becomes visible t
 
 The Ledger does not copy private chain-of-thought or every tool call into this Event. Those details belong to the harness trajectory. The smallest auditable unit in Coral is one logical turn connected to its causal inputs, its before-and-after workspace state, and its native trajectory checkpoint.
 
+With the read-only `coral review` command, an agent can browse its visible Ledger history, inspect one Event, or follow a turn into its native harness trajectory. Review creates no new Event, and a Fork only sees Main through its source frontier plus its own later Events.
+
 A normal turn looks roughly like this:
 
 ```text
@@ -413,7 +415,7 @@ To see whether any of this is useful outside a diagram, I built a real example: 
 
 It observes my work through a Screen Plugin and lets me talk to it through a Chat Plugin. Screen does not continuously record my entire display. It captures sparse foreground-window activity when something meaningfully changes. Images and OCR remain in the Plugin's local state, and Memory Builder or Proactivity load them only when an activity appears relevant.
 
-The four agents have different jobs. Chat Agent is the only direct conversational interface. Memory Builder tries to organize what the system learns about me. Proactivity looks for evidence about what I may need next. Auditor examines the available evidence and sends concrete suggestions to the responsible agent.
+The four agents have different jobs. Chat Agent is the only direct conversational interface. Memory Builder tries to organize what the system learns about me. Proactivity looks for evidence about what I may need next. Auditor uses `coral review` and read-only workspace snapshots to suggest concrete improvements to the responsible agent.
 
 I also wanted a better way to understand the swarm from the outside, so I built a UI called the View. The default Overview projects the swarm's evolution, topology, and Ledger history. An active Plugin can add its own View extension, which appears next to Overview in the top navigation. That lets Chat and Screen have their own pages without pushing their semantics into the default UI.
 
