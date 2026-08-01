@@ -1287,7 +1287,9 @@ export default function Home() {
               </header>
 
               <div className="dossier-records">
-                <div className={`records-list${section.entries.length > 3 ? " is-expanded" : ""}`}>
+                <div
+                  className={`records-list${section.id === "chronology" ? " is-expanded" : ""}${section.entries.length === 4 ? " is-quartet" : ""}`}
+                >
                   {section.entries.map((entry) => (
                     <div
                       className="poster-anchor"

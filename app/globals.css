@@ -361,13 +361,14 @@ body::selection { background: var(--red); color: #fff; }
   position: sticky;
   top: 0;
   height: 100svh;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 
 .section-title-position {
   position: absolute;
   inset: 0;
+  z-index: 3;
   display: grid;
   place-items: center;
   padding: 0 2.5vw;
@@ -388,7 +389,9 @@ body::selection { background: var(--red); color: #fff; }
   will-change: opacity, transform;
 }
 
-.dossier-section.is-title-visible .section-title-hit { opacity: 1; }
+.dossier-section.is-title-visible .section-title-hit {
+  opacity: calc(1 - var(--title-exit));
+}
 
 .section-title-hit h2 {
   display: flex;
@@ -444,11 +447,6 @@ body::selection { background: var(--red); color: #fff; }
   padding: 8px clamp(12px, 3vw, 48px) 18px;
 }
 
-.dossier-section[data-section="chronology"] .dossier-records {
-  top: auto;
-  bottom: clamp(38px, 5vh, 56px);
-}
-
 .records-list.is-expanded {
   --timeline-card: clamp(172px, 15.5vw, 200px);
   grid-template-columns: repeat(3, var(--timeline-card));
@@ -469,6 +467,17 @@ body::selection { background: var(--red); color: #fff; }
 .records-list.is-expanded .poster-anchor:nth-child(4) { grid-area: poster-4; }
 .records-list.is-expanded .poster-anchor:nth-child(5) { grid-area: poster-5; }
 .records-list.is-expanded .poster-anchor:nth-child(6) { grid-area: poster-6; }
+
+.records-list.is-quartet {
+  --project-card: clamp(150px, 14.5vw, 190px);
+  grid-template-columns: repeat(2, var(--project-card));
+  grid-template-rows: repeat(2, calc(var(--project-card) * 1.25));
+  justify-content: center;
+  width: min(76vw, 720px);
+  margin: 0 auto;
+  gap: clamp(46px, 6vh, 66px) clamp(90px, 14vw, 210px);
+  padding: 8px 0 18px;
+}
 
 .records-list::before {
   content: "";
@@ -495,6 +504,21 @@ body::selection { background: var(--red); color: #fff; }
   right: calc(var(--timeline-card) / 2);
   top: calc(var(--timeline-card) * .625 + 8px);
   bottom: calc(var(--timeline-card) * .625 + 18px);
+  height: auto;
+  border-top: 1px solid rgba(197, 213, 215, .5);
+  border-right: 1px solid rgba(197, 213, 215, .5);
+  border-bottom: 1px solid rgba(197, 213, 215, .5);
+  background: none;
+  box-shadow: 0 0 8px rgba(160, 195, 200, .1);
+  opacity: var(--records-progress);
+  transform: none;
+}
+
+.records-list.is-quartet::before {
+  left: calc(var(--project-card) / 2);
+  right: calc(var(--project-card) / 2);
+  top: calc(var(--project-card) * .625 + 8px);
+  bottom: calc(var(--project-card) * .625 + 18px);
   height: auto;
   border-top: 1px solid rgba(197, 213, 215, .5);
   border-right: 1px solid rgba(197, 213, 215, .5);
@@ -1216,12 +1240,14 @@ html {
     transform: none;
   }
 
-  .records-list {
+  .records-list,
+  .records-list.is-quartet {
     --mobile-poster-min: 220px;
     grid-template-columns: repeat(
       auto-fit,
       minmax(min(100%, var(--mobile-poster-min)), 1fr)
     );
+    grid-template-rows: none;
     align-items: start;
     justify-content: center;
     width: min(100%, 720px);
@@ -1230,13 +1256,15 @@ html {
     padding: 8px 24px 24px;
   }
 
-  .records-list::before {
+  .records-list::before,
+  .records-list.is-quartet::before {
     left: 50%;
     right: auto;
     top: -28px;
     bottom: -28px;
     width: 1px;
     height: auto;
+    border: 0;
     background: linear-gradient(
       180deg,
       transparent,
@@ -1244,6 +1272,7 @@ html {
       rgba(197, 213, 215, .48) 94%,
       transparent
     );
+    opacity: 1;
     transform: none;
   }
 

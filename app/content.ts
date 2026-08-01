@@ -107,6 +107,22 @@ export const dossierSections: readonly DossierSection[] = [
     entries: [
       {
         marker: "OPEN SOURCE / 01",
+        title: "Coral",
+        detail: "Self-evolving agents · Git · ledger",
+        company: "Auditable evolution for agent swarms",
+        summary: "A framework where Agents evolve by changing code and committing it.",
+        highlights: [
+          "Agent workspaces evolve through exact Git commits",
+          "Whole-Swarm changes ship as human-approved Revisions",
+          "An append-only Ledger reconstructs every evolution step",
+        ],
+        href: "https://github.com/siwei-yuan/coral",
+        screenshot: "https://raw.githubusercontent.com/siwei-yuan/coral/main/assets/coral-wordmark.png",
+        screenshotAlt: "Coral self-evolving agent framework wordmark and mascot",
+        screenshotOrientation: "landscape",
+      },
+      {
+        marker: "OPEN SOURCE / 02",
         title: "KeyTally",
         detail: "AI telemetry · QMK/VIA · macOS",
         company: "The tally light for your AI",
@@ -122,7 +138,7 @@ export const dossierSections: readonly DossierSection[] = [
         screenshotOrientation: "landscape",
       },
       {
-        marker: "OPEN SOURCE / 02",
+        marker: "OPEN SOURCE / 03",
         title: "Bili Pilot",
         detail: "CDN routing · DASH pre-cache · Chrome",
         company: "Stable high-bitrate Bilibili playback",
@@ -138,7 +154,7 @@ export const dossierSections: readonly DossierSection[] = [
         screenshotOrientation: "portrait",
       },
       {
-        marker: "OPEN SOURCE / 03",
+        marker: "OPEN SOURCE / 04",
         title: "Aperture",
         detail: "Agent privacy · ReBAC · disclosure ledger",
         company: "Disclosure control for personal AI agents",
