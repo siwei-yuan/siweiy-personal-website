@@ -707,6 +707,309 @@ export default function Home() {
         }
       `,
     });
+
+    const glassMaterial = new THREE.ShaderMaterial({
+      transparent: true,
+      blending: THREE.NormalBlending,
+      depthWrite: false,
+      depthTest: true,
+      toneMapped: false,
+      uniforms: { uTime: { value: 0 }, uFade: { value: 1 } },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        varying vec2 vUv;
+        uniform float uTime;
+        uniform float uFade;
+
+        #define PI 3.14159265359
+        #define TAU 6.28318530718
+
+        float hash21(vec2 p) {
+          p = fract(p * vec2(123.34, 456.21));
+          p += dot(p, p + 45.32);
+          return fract(p.x * p.y);
+        }
+
+        float noise21(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(
+            mix(hash21(i), hash21(i + vec2(1.0, 0.0)), f.x),
+            mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0)), f.x),
+            f.y
+          );
+        }
+
+        float fbm(vec2 p) {
+          float value = 0.0;
+          float amplitude = 0.5;
+          for (int i = 0; i < 4; i++) {
+            value += noise21(p) * amplitude;
+            p = mat2(1.72, 1.18, -1.18, 1.72) * p + 0.17;
+            amplitude *= 0.5;
+          }
+          return value;
+        }
+
+        mat2 rotate2(float angle) {
+          float c = cos(angle);
+          float s = sin(angle);
+          return mat2(c, -s, s, c);
+        }
+
+        float sdEquilateralTriangle(vec2 p) {
+          const float k = 1.73205080757;
+          p.x = abs(p.x) - 1.0;
+          p.y = p.y + 1.0 / k;
+          if (p.x + k * p.y > 0.0) {
+            p = vec2(p.x - k * p.y, -k * p.x - p.y) * 0.5;
+          }
+          p.x -= clamp(p.x, -2.0, 0.0);
+          return -length(p) * sign(p.y);
+        }
+
+        float triangleDistance(vec2 p, vec2 size, float rotation) {
+          p = rotate2(rotation) * p;
+          vec2 normalized = p / size;
+          return sdEquilateralTriangle(normalized) * min(size.x, size.y);
+        }
+
+        void main() {
+          vec2 p = (vUv - 0.5) * 2.0;
+          float radius = length(p);
+          float angle = atan(p.y, p.x);
+          float drift = sin(uTime * 0.09) * 0.045;
+          float span = TAU / 12.0;
+          float wrappedAngle = mod(angle + PI + drift, TAU);
+          float segmentId = floor(wrappedAngle / span);
+          float mirrorId = min(segmentId, 11.0 - segmentId);
+          float localAngle = mod(wrappedAngle + span * 0.5, span) - span * 0.5;
+          float phase = uTime * 0.43 + mirrorId * 1.73;
+          float phaseB = uTime * 0.31 - mirrorId * 1.11;
+          float localTangent = localAngle * radius;
+          float coarse = fbm(vec2(mirrorId * 0.71, radius * 9.0) + vec2(uTime * 0.025, -uTime * 0.018));
+          float fine = fbm(vec2(localTangent * 21.0, radius * 25.0) + vec2(-uTime * 0.035, uTime * 0.021));
+
+          // A slow, legible kaleidoscope cycle: fragments breathe apart, gather
+          // into a shared petal, then fold through one another before splitting.
+          float morphClock = uTime * 0.58;
+          float cycle = 0.5 + 0.5 * sin(morphClock);
+          float gather = smoothstep(0.36, 0.82, cycle);
+          gather = gather * gather * (3.0 - 2.0 * gather);
+          float release = smoothstep(0.18, 0.72, 0.5 + 0.5 * sin(morphClock + 2.15));
+          float ringBreath = 0.44 + 1.42 * (0.5 + 0.5 * sin(morphClock - 0.72));
+          float separation = mix(1.68, 0.08, gather);
+          float sharedRadius = 0.842 + sin(morphClock * 0.73 + mirrorId * 0.27) * 0.022;
+          float animatedRadius = radius
+            + sin(morphClock - 0.82) * 0.078
+            + sin(morphClock * 2.0 + mirrorId * 0.13) * 0.018;
+
+          float radialDistortion = sin(angle * 3.0 + uTime * 0.16) * 0.0035
+            + sin(angle * 11.0 - uTime * 0.21) * 0.0018;
+          float ringRadius = 0.735 - radialDistortion;
+          float ringDistance = radius + radialDistortion - 0.735;
+          float closeGlow = exp(-pow(ringDistance / 0.036, 2.0));
+          float farGlow = exp(-pow(ringDistance / 0.096, 2.0));
+
+          float foldA = 0.5 + 0.5 * sin(phase * 0.72);
+          vec2 shardA = vec2(
+            localTangent + (-0.105 + sin(phaseB) * 0.038) * separation,
+            animatedRadius - mix(0.718 + sin(phase) * 0.054, sharedRadius, gather * 0.9)
+          );
+          shardA.x += shardA.y * sin(phase * 0.61) * (1.15 + release * 0.9);
+          shardA.x = mix(shardA.x, abs(shardA.x) - 0.026, foldA * (0.72 + release * 0.2));
+          shardA.y += abs(shardA.x) * foldA * (0.34 + release * 0.42);
+          float pulseA = ringBreath * (0.82 + 0.34 * sin(phase * 0.83));
+          vec2 sizeA = vec2(
+            (0.072 + foldA * 0.052) * pulseA,
+            (0.104 + (1.0 - foldA) * 0.078) * mix(pulseA, 1.42 - pulseA * 0.24, gather)
+          );
+          float dA = triangleDistance(
+            shardA,
+            sizeA,
+            sin(phase * 0.48) * (0.9 + release * 0.72) + gather * 0.48
+          );
+
+          float foldB = 0.5 + 0.5 * cos(phaseB * 0.81 + 1.2);
+          vec2 shardB = vec2(
+            localTangent + sin(phase * 0.77) * 0.045 * separation,
+            animatedRadius - mix(0.858 + cos(phaseB * 0.64) * 0.058, sharedRadius, gather * 0.96)
+          );
+          shardB.x -= shardB.y * cos(phaseB * 0.54) * (0.82 + release * 0.96);
+          shardB.y = mix(shardB.y, abs(shardB.y) - 0.018, foldB * (0.62 + release * 0.26));
+          float pulseB = (0.72 + ringBreath * 0.68) * (0.8 + 0.38 * cos(phaseB * 0.71));
+          vec2 sizeB = vec2(
+            (0.055 + foldB * 0.043) * pulseB,
+            (0.076 + (1.0 - foldB) * 0.071) * mix(pulseB, 1.34, gather)
+          );
+          float dB = triangleDistance(
+            shardB,
+            sizeB,
+            1.05 + sin(phaseB * 0.55) * (0.72 + release * 0.88) - gather * 0.34
+          );
+
+          float foldC = 0.5 + 0.5 * sin(phase * 0.63 + 2.4);
+          vec2 shardC = vec2(
+            localTangent + (0.112 + cos(phaseB * 0.69) * 0.041) * separation,
+            animatedRadius - mix(0.982 + sin(phase * 0.52 + 1.0) * 0.047, sharedRadius, gather * 0.88)
+          );
+          shardC.x = mix(shardC.x, -abs(shardC.x) + 0.018, foldC * (0.48 + release * 0.34));
+          shardC.x += shardC.y * sin(phaseB * 0.77) * (0.95 + release * 1.08);
+          float pulseC = (0.66 + ringBreath * 0.74) * (0.81 + 0.36 * sin(phase * 0.59 + 1.7));
+          vec2 sizeC = vec2(
+            (0.043 + (1.0 - foldC) * 0.044) * pulseC,
+            (0.064 + foldC * 0.068) * mix(pulseC, 1.28, gather)
+          );
+          float dC = triangleDistance(
+            shardC,
+            sizeC,
+            -0.82 + cos(phase * 0.49) * (0.95 + release * 0.82) + gather * 0.42
+          );
+
+          // During the gather phase a larger mirrored petal grows out of the
+          // overlapping shards, making the combination/recomposition readable.
+          vec2 compositeShard = vec2(
+            localTangent + sin(morphClock * 0.81 + mirrorId * 0.31) * 0.012,
+            animatedRadius - sharedRadius
+          );
+          compositeShard.x += compositeShard.y * sin(morphClock * 0.67) * 0.78;
+          vec2 compositeSize = vec2(
+            mix(0.055, 0.224, gather),
+            mix(0.072, 0.318, gather) * (0.84 + 0.2 * sin(morphClock * 0.91))
+          );
+          float dComposite = triangleDistance(
+            compositeShard,
+            compositeSize,
+            sin(morphClock * 0.53 + mirrorId * 0.11) * 0.62
+          );
+
+          float individualWeight = mix(1.0, 0.34, gather);
+          float fillA = (1.0 - smoothstep(-0.006, 0.009, dA)) * individualWeight;
+          float fillB = (1.0 - smoothstep(-0.005, 0.008, dB)) * individualWeight;
+          float fillC = (1.0 - smoothstep(-0.004, 0.007, dC)) * individualWeight;
+          float fillComposite = (1.0 - smoothstep(-0.006, 0.01, dComposite)) * gather;
+          float edgeA = exp(-abs(dA) / 0.0055) * individualWeight;
+          float edgeB = exp(-abs(dB) / 0.005) * individualWeight;
+          float edgeC = exp(-abs(dC) / 0.0045) * individualWeight;
+          float edgeComposite = exp(-abs(dComposite) / 0.0058) * gather * (0.82 + gather * 0.52);
+          float shardFill = max(fillComposite, max(fillA, max(fillB, fillC)));
+          float fracture = mix(0.68, 1.0, fine) * (0.82 + coarse * 0.18);
+          float outerShardZone = smoothstep(0.705, 0.77, radius);
+          shardFill *= fracture * outerShardZone;
+
+          float broadFlowA = pow(0.5 + 0.5 * sin(shardA.x * 54.0 + shardA.y * 31.0 - uTime * 0.73 + mirrorId), 4.0);
+          float broadFlowB = pow(0.5 + 0.5 * sin(shardB.x * 61.0 - shardB.y * 28.0 - uTime * 0.62 + mirrorId * 0.73), 4.0);
+          float broadFlowC = pow(0.5 + 0.5 * sin(shardC.x * 49.0 + shardC.y * 35.0 - uTime * 0.79 - mirrorId * 0.61), 4.0);
+          float needleFlowA = pow(0.5 + 0.5 * sin(shardA.x * 103.0 - shardA.y * 66.0 - uTime * 1.51 + mirrorId * 1.37), 14.0);
+          float needleFlowB = pow(0.5 + 0.5 * sin(shardB.x * 117.0 + shardB.y * 59.0 - uTime * 1.34 - mirrorId * 0.91), 14.0);
+          float needleFlowC = pow(0.5 + 0.5 * sin(shardC.x * 96.0 - shardC.y * 71.0 - uTime * 1.67 + mirrorId * 0.54), 14.0);
+          float flowA = clamp(broadFlowA * 0.42 + needleFlowA, 0.0, 1.0);
+          float flowB = clamp(broadFlowB * 0.42 + needleFlowB, 0.0, 1.0);
+          float flowC = clamp(broadFlowC * 0.42 + needleFlowC, 0.0, 1.0);
+          float flowComposite = pow(
+            0.5 + 0.5 * sin(compositeShard.x * 72.0 - compositeShard.y * 39.0 - uTime * 1.08),
+            7.0
+          );
+          vec2 lightDirection = normalize(vec2(cos(-0.76), sin(-0.76)));
+          vec2 radialDirection = normalize(p + vec2(0.0001));
+          vec2 tangentDirection = vec2(-radialDirection.y, radialDirection.x);
+          vec2 localLight = normalize(vec2(
+            dot(lightDirection, tangentDirection),
+            dot(lightDirection, radialDirection)
+          ));
+          float incidenceA = 0.16 + 0.84 * pow(abs(dot(normalize(shardA + vec2(0.0001)), localLight)), 2.4);
+          float incidenceB = 0.16 + 0.84 * pow(abs(dot(normalize(shardB + vec2(0.0001)), localLight)), 2.4);
+          float incidenceC = 0.16 + 0.84 * pow(abs(dot(normalize(shardC + vec2(0.0001)), localLight)), 2.4);
+          float incidenceComposite = 0.16 + 0.84 * pow(abs(dot(normalize(compositeShard + vec2(0.0001)), localLight)), 2.4);
+          float faintEdges = max(
+            edgeComposite * incidenceComposite,
+            max(edgeA * incidenceA, max(edgeB * incidenceB, edgeC * incidenceC))
+          ) * fracture * outerShardZone;
+          float flowingEdges = max(
+            edgeComposite * flowComposite * incidenceComposite,
+            max(edgeA * flowA * incidenceA, max(edgeB * flowB * incidenceB, edgeC * flowC * incidenceC))
+          ) * fracture * outerShardZone;
+          float shardBloom = exp(-abs(min(dComposite, min(dA, min(dB, dC)))) / 0.026) * flowingEdges;
+
+          float internalA = pow(0.5 + 0.5 * sin(shardA.x * 38.0 - shardA.y * 72.0 + uTime * 0.82 + mirrorId), 9.0) * fillA;
+          float internalB = pow(0.5 + 0.5 * sin(shardB.x * 44.0 + shardB.y * 65.0 - uTime * 0.69 - mirrorId * 0.7), 9.0) * fillB;
+          float internalC = pow(0.5 + 0.5 * sin(shardC.x * 35.0 - shardC.y * 81.0 + uTime * 0.94 + mirrorId * 0.43), 9.0) * fillC;
+          float internalComposite = pow(
+            0.5 + 0.5 * sin(compositeShard.x * 31.0 + compositeShard.y * 58.0 - uTime * 0.61),
+            7.0
+          ) * fillComposite;
+          float internalCaustics = max(internalComposite, max(internalA, max(internalB, internalC)))
+            * fracture
+            * outerShardZone;
+
+          float angularLight = cos(angle + 0.76) * 0.5 + 0.5;
+          float pulse = 0.88 + sin(uTime * 0.33) * 0.12;
+          vec3 deepBlue = vec3(0.025, 0.11, 0.34);
+          vec3 electricBlue = vec3(0.08, 0.46, 1.05);
+          vec3 cyan = vec3(0.16, 0.92, 1.18);
+          vec3 violet = vec3(0.46, 0.12, 0.94);
+          vec3 white = vec3(1.55, 1.7, 1.72);
+          float refractedRadius = radius
+            + (fine - 0.5) * 0.046
+            + sin(localTangent * 24.0 + phase * 0.63) * 0.021
+            + sin(localTangent * 57.0 - phaseB * 0.42) * 0.008;
+          float refractR = exp(-pow((refractedRadius - ringRadius - 0.018) / 0.013, 2.0));
+          float refractG = exp(-pow((refractedRadius - ringRadius) / 0.012, 2.0));
+          float refractB = exp(-pow((refractedRadius - ringRadius + 0.025) / 0.015, 2.0));
+          float refractGhost = exp(-pow((refractedRadius - ringRadius
+            + sin(phase * 0.77 + localTangent * 19.0) * 0.035) / 0.024, 2.0));
+          vec3 refractedLight = vec3(
+            refractR * 0.72 + refractGhost * 0.14,
+            refractG * 0.86 + refractGhost * 0.2,
+            refractB * 1.28 + refractGhost * 0.36
+          )
+            * shardFill
+            * (0.34 + pow(angularLight, 2.2) * 1.06);
+
+          vec3 spectral = mix(deepBlue, electricBlue, coarse);
+          spectral = mix(spectral, violet, smoothstep(0.68, 0.95, fine) * 0.28);
+          spectral = mix(spectral, cyan, flowingEdges * 0.72);
+          spectral += vec3(0.15, 0.008, 0.006) * pow(angularLight, 10.0) * 0.42;
+          float sourceFacing = 0.3 + pow(angularLight, 4.5) * 0.7;
+          vec3 darkGlass = mix(vec3(0.0015, 0.003, 0.005), vec3(0.006, 0.013, 0.022), coarse);
+          vec3 internalSpectrum = mix(
+            electricBlue,
+            mix(cyan, violet, 0.5 + 0.5 * sin(phaseB + uTime * 0.23)),
+            fine
+          );
+          vec3 color = darkGlass * shardFill;
+          color += refractedLight * 0.6;
+          color += internalSpectrum * internalCaustics * (0.28 + angularLight * 0.3);
+          color += spectral * closeGlow * shardFill * (0.07 + angularLight * 0.16);
+          color += spectral * faintEdges * (0.84 + gather * 0.24);
+          color += mix(spectral, white, flowingEdges * 0.34) * flowingEdges * sourceFacing * 1.3;
+
+          float glassOpacity = shardFill * (0.13 + coarse * 0.06);
+          float edgeOpacity = faintEdges * (0.78 + gather * 0.22) + flowingEdges * sourceFacing * 1.16;
+          float refractionOpacity = max(refractR, max(refractG, refractB)) * shardFill * 0.46
+            + refractGhost * shardFill * 0.16;
+          float internalOpacity = internalCaustics * (0.17 + angularLight * 0.2);
+          float bloom = shardBloom * 0.18
+            + closeGlow * flowingEdges * 0.09
+            + farGlow * flowingEdges * 0.03;
+          float outerFeather = 1.0 - smoothstep(0.985, 1.0, radius);
+          float alpha = (glassOpacity + edgeOpacity + refractionOpacity + internalOpacity + bloom)
+            * pulse
+            * outerFeather
+            * uFade;
+          alpha *= smoothstep(0.43, 0.52, radius);
+          gl_FragColor = vec4(color, alpha);
+        }
+      `,
+    });
     const eclipseMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -999,6 +1302,10 @@ export default function Home() {
     halo.position.set(0, 0.45, -8.5);
     halo.renderOrder = 2;
     monument.add(halo);
+    const glassHalo = new THREE.Mesh(new THREE.CircleGeometry(9.6, 224), glassMaterial);
+    glassHalo.position.set(0, 0.45, -8.44);
+    glassHalo.renderOrder = 3;
+    monument.add(glassHalo);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
     const nameGeometry = createNameGeometry("SIWEI YUAN");
@@ -1207,8 +1514,10 @@ export default function Home() {
 
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
+      glassMaterial.uniforms.uTime.value = elapsed;
       eclipseMaterial.uniforms.uFade.value = 1;
       haloMaterial.uniforms.uFade.value = 1;
+      glassMaterial.uniforms.uFade.value = 1;
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
     };
@@ -1228,6 +1537,7 @@ export default function Home() {
         if (object instanceof THREE.Mesh) object.geometry.dispose();
       });
       haloMaterial.dispose();
+      glassMaterial.dispose();
       eclipseMaterial.dispose();
       backgroundBoardMaterial.dispose();
       pyramidFrontMaterial.dispose();
