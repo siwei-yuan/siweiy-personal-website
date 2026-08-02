@@ -1088,6 +1088,29 @@ body::selection { background: var(--red); color: #fff; }
   pointer-events: auto;
 }
 
+.design-credit {
+  position: absolute;
+  bottom: clamp(18px, 3.2svh, 38px);
+  left: 50%;
+  z-index: 54;
+  width: min(92vw, 760px);
+  margin: 0;
+  color: rgba(189, 204, 210, .28);
+  font-family: var(--font-muli), Arial, sans-serif;
+  font-size: clamp(.54rem, .62vw, .68rem);
+  font-weight: 200;
+  letter-spacing: .075em;
+  line-height: 1.5;
+  text-align: center;
+  opacity: clamp(0, calc((var(--finale-progress) - .68) * 3.4), 1);
+  transform: translate3d(-50%, 8px, 0);
+  transition: opacity 160ms linear, transform 400ms cubic-bezier(.2, .8, .2, 1);
+}
+
+.social-finale.is-social-active .design-credit {
+  transform: translate3d(-50%, 0, 0);
+}
+
 .social-link {
   position: absolute;
   display: grid;

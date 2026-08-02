@@ -714,7 +714,13 @@ export default function Home() {
       depthWrite: false,
       depthTest: true,
       toneMapped: false,
-      uniforms: { uTime: { value: 0 }, uFade: { value: 1 } },
+      uniforms: {
+        uTime: { value: 0 },
+        uFade: { value: 1 },
+        uLayerMode: { value: 0 },
+        uLayerPhase: { value: 0 },
+        uLayerIntensity: { value: 1 },
+      },
       vertexShader: /* glsl */ `
         varying vec2 vUv;
         void main() {
@@ -727,6 +733,9 @@ export default function Home() {
         varying vec2 vUv;
         uniform float uTime;
         uniform float uFade;
+        uniform float uLayerMode;
+        uniform float uLayerPhase;
+        uniform float uLayerIntensity;
 
         #define PI 3.14159265359
         #define TAU 6.28318530718
@@ -786,21 +795,26 @@ export default function Home() {
           vec2 p = (vUv - 0.5) * 2.0;
           float radius = length(p);
           float angle = atan(p.y, p.x);
+          float middleLayer = step(0.5, uLayerMode) * (1.0 - step(1.5, uLayerMode));
+          float outerLayer = step(1.5, uLayerMode);
+          float layerTime = uTime * (1.0 + middleLayer * 0.46 - outerLayer * 0.28) + uLayerPhase;
           float drift = sin(uTime * 0.09) * 0.045;
-          float span = TAU / 12.0;
+          float segmentCount = mix(12.0, 18.0, middleLayer);
+          segmentCount = mix(segmentCount, 8.0, outerLayer);
+          float span = TAU / segmentCount;
           float wrappedAngle = mod(angle + PI + drift, TAU);
           float segmentId = floor(wrappedAngle / span);
-          float mirrorId = min(segmentId, 11.0 - segmentId);
+          float mirrorId = min(segmentId, segmentCount - 1.0 - segmentId);
           float localAngle = mod(wrappedAngle + span * 0.5, span) - span * 0.5;
-          float phase = uTime * 0.43 + mirrorId * 1.73;
-          float phaseB = uTime * 0.31 - mirrorId * 1.11;
+          float phase = layerTime * 0.43 + mirrorId * 1.73;
+          float phaseB = layerTime * 0.31 - mirrorId * 1.11;
           float localTangent = localAngle * radius;
           float coarse = fbm(vec2(mirrorId * 0.71, radius * 9.0) + vec2(uTime * 0.025, -uTime * 0.018));
           float fine = fbm(vec2(localTangent * 21.0, radius * 25.0) + vec2(-uTime * 0.035, uTime * 0.021));
 
           // A slow, legible kaleidoscope cycle: fragments breathe apart, gather
           // into a shared petal, then fold through one another before splitting.
-          float morphClock = uTime * 0.58;
+          float morphClock = layerTime * 0.58;
           float cycle = 0.5 + 0.5 * sin(morphClock);
           float gather = smoothstep(0.36, 0.82, cycle);
           gather = gather * gather * (3.0 - 2.0 * gather);
@@ -832,6 +846,10 @@ export default function Home() {
             (0.072 + foldA * 0.052) * pulseA,
             (0.104 + (1.0 - foldA) * 0.078) * mix(pulseA, 1.42 - pulseA * 0.24, gather)
           );
+          sizeA *= vec2(
+            1.0 - middleLayer * 0.28 + outerLayer * 0.62,
+            1.0 - middleLayer * 0.58 + outerLayer * 0.38
+          );
           float dA = triangleDistance(
             shardA,
             sizeA,
@@ -849,6 +867,10 @@ export default function Home() {
           vec2 sizeB = vec2(
             (0.055 + foldB * 0.043) * pulseB,
             (0.076 + (1.0 - foldB) * 0.071) * mix(pulseB, 1.34, gather)
+          );
+          sizeB *= vec2(
+            1.0 - middleLayer * 0.34 + outerLayer * 0.72,
+            1.0 - middleLayer * 0.62 + outerLayer * 0.44
           );
           float dB = triangleDistance(
             shardB,
@@ -868,6 +890,10 @@ export default function Home() {
             (0.043 + (1.0 - foldC) * 0.044) * pulseC,
             (0.064 + foldC * 0.068) * mix(pulseC, 1.28, gather)
           );
+          sizeC *= vec2(
+            1.0 - middleLayer * 0.3 + outerLayer * 0.82,
+            1.0 - middleLayer * 0.6 + outerLayer * 0.5
+          );
           float dC = triangleDistance(
             shardC,
             sizeC,
@@ -884,6 +910,10 @@ export default function Home() {
           vec2 compositeSize = vec2(
             mix(0.055, 0.224, gather),
             mix(0.072, 0.318, gather) * (0.84 + 0.2 * sin(morphClock * 0.91))
+          );
+          compositeSize *= vec2(
+            1.0 - middleLayer * 0.25 + outerLayer * 0.78,
+            1.0 - middleLayer * 0.6 + outerLayer * 0.46
           );
           float dComposite = triangleDistance(
             compositeShard,
@@ -952,10 +982,10 @@ export default function Home() {
 
           float angularLight = cos(angle + 0.76) * 0.5 + 0.5;
           float pulse = 0.88 + sin(uTime * 0.33) * 0.12;
-          vec3 deepBlue = vec3(0.025, 0.11, 0.34);
-          vec3 electricBlue = vec3(0.08, 0.46, 1.05);
-          vec3 cyan = vec3(0.16, 0.92, 1.18);
-          vec3 violet = vec3(0.46, 0.12, 0.94);
+          vec3 deepBlue = vec3(0.035, 0.075, 0.13);
+          vec3 electricBlue = vec3(0.16, 0.36, 0.52);
+          vec3 cyan = vec3(0.34, 0.58, 0.68);
+          vec3 violet = vec3(0.31, 0.2, 0.4);
           vec3 white = vec3(1.55, 1.7, 1.72);
           float refractedRadius = radius
             + (fine - 0.5) * 0.046
@@ -978,12 +1008,22 @@ export default function Home() {
           spectral = mix(spectral, violet, smoothstep(0.68, 0.95, fine) * 0.28);
           spectral = mix(spectral, cyan, flowingEdges * 0.72);
           spectral += vec3(0.15, 0.008, 0.006) * pow(angularLight, 10.0) * 0.42;
+          vec3 redSpectrum = mix(vec3(0.22, 0.002, 0.004), vec3(1.18, 0.035, 0.018), coarse);
+          redSpectrum = mix(redSpectrum, vec3(1.42, 0.16, 0.07), flowingEdges * 0.66);
+          spectral = mix(spectral, redSpectrum, middleLayer * 0.94);
+          spectral = mix(spectral, vec3(0.22, 0.38, 0.52), outerLayer * 0.5);
           float sourceFacing = 0.3 + pow(angularLight, 4.5) * 0.7;
           vec3 darkGlass = mix(vec3(0.0015, 0.003, 0.005), vec3(0.006, 0.013, 0.022), coarse);
           vec3 internalSpectrum = mix(
             electricBlue,
             mix(cyan, violet, 0.5 + 0.5 * sin(phaseB + uTime * 0.23)),
             fine
+          );
+          internalSpectrum = mix(internalSpectrum, redSpectrum, middleLayer * 0.92);
+          refractedLight = mix(
+            refractedLight,
+            refractedLight * vec3(1.34, 0.12, 0.055),
+            middleLayer * 0.86
           );
           vec3 color = darkGlass * shardFill;
           color += refractedLight * 0.6;
@@ -1001,15 +1041,42 @@ export default function Home() {
             + closeGlow * flowingEdges * 0.09
             + farGlow * flowingEdges * 0.03;
           float outerFeather = 1.0 - smoothstep(0.985, 1.0, radius);
+          float middleBand = smoothstep(0.735, 0.775, radius)
+            * (1.0 - smoothstep(0.86, 0.905, radius));
+          float outerBand = smoothstep(0.705, 0.75, radius)
+            * (1.0 - smoothstep(0.945, 0.985, radius));
+          float outerBoundary = outerLayer
+            * exp(-pow((radius - 0.942) / 0.026, 2.0))
+            * max(faintEdges * 0.72, flowingEdges)
+            * outerBand;
+          color += mix(spectral, white, 0.3) * outerBoundary * 0.52;
+          edgeOpacity += outerBoundary * 0.68;
+          float sparseSegment = mix(
+            0.035,
+            1.0,
+            step(1.5, mod(segmentId + floor(morphClock * 0.12), 4.0))
+          );
+          float layerMask = mix(1.0, middleBand, middleLayer);
+          layerMask = mix(layerMask, outerBand * sparseSegment, outerLayer);
           float alpha = (glassOpacity + edgeOpacity + refractionOpacity + internalOpacity + bloom)
             * pulse
             * outerFeather
+            * layerMask
+            * uLayerIntensity
             * uFade;
           alpha *= smoothstep(0.43, 0.52, radius);
           gl_FragColor = vec4(color, alpha);
         }
       `,
     });
+    const redGlassMaterial = glassMaterial.clone();
+    redGlassMaterial.uniforms.uLayerMode.value = 1;
+    redGlassMaterial.uniforms.uLayerPhase.value = 1.85;
+    redGlassMaterial.uniforms.uLayerIntensity.value = 0.9;
+    const outerGlassMaterial = glassMaterial.clone();
+    outerGlassMaterial.uniforms.uLayerMode.value = 2;
+    outerGlassMaterial.uniforms.uLayerPhase.value = 4.1;
+    outerGlassMaterial.uniforms.uLayerIntensity.value = 0.74;
     const eclipseMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -1161,8 +1228,8 @@ export default function Home() {
       `,
     });
     const pyramidLeftMaterial = makePointLitFaceMaterial(
-      0x081012,
-      0x8fa8ad,
+      0x071019,
+      0x6a8fa8,
       new THREE.Vector2(-8.75, 3.35),
       2.5,
       1.92,
@@ -1261,7 +1328,7 @@ export default function Home() {
     addGlowingSeam(
       new THREE.Vector3(-11.0, 8.6, 0.55),
       new THREE.Vector3(0, -8.6, 2.0),
-      0x91b5bc,
+      0x789eb6,
     );
     addGlowingSeam(
       new THREE.Vector3(11.0, 8.6, 0.55),
@@ -1304,8 +1371,16 @@ export default function Home() {
     monument.add(halo);
     const glassHalo = new THREE.Mesh(new THREE.CircleGeometry(9.6, 224), glassMaterial);
     glassHalo.position.set(0, 0.45, -8.44);
-    glassHalo.renderOrder = 3;
+    glassHalo.renderOrder = 5;
     monument.add(glassHalo);
+    const redGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(12.35, 224), redGlassMaterial);
+    redGlassHalo.position.set(0, 0.45, -8.46);
+    redGlassHalo.renderOrder = 4;
+    monument.add(redGlassHalo);
+    const outerGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(15.0, 224), outerGlassMaterial);
+    outerGlassHalo.position.set(0, 0.45, -8.48);
+    outerGlassHalo.renderOrder = 3;
+    monument.add(outerGlassHalo);
 
     // The name is a sampled type silhouette: every visible mark is a particle.
     const nameGeometry = createNameGeometry("SIWEI YUAN");
@@ -1515,9 +1590,13 @@ export default function Home() {
       eclipseMaterial.uniforms.uTime.value = elapsed;
       haloMaterial.uniforms.uTime.value = elapsed;
       glassMaterial.uniforms.uTime.value = elapsed;
+      redGlassMaterial.uniforms.uTime.value = elapsed;
+      outerGlassMaterial.uniforms.uTime.value = elapsed;
       eclipseMaterial.uniforms.uFade.value = 1;
       haloMaterial.uniforms.uFade.value = 1;
       glassMaterial.uniforms.uFade.value = 1;
+      redGlassMaterial.uniforms.uFade.value = 1;
+      outerGlassMaterial.uniforms.uFade.value = 1;
       renderer.render(scene, camera);
       animationFrame = requestAnimationFrame(animate);
     };
@@ -1538,6 +1617,8 @@ export default function Home() {
       });
       haloMaterial.dispose();
       glassMaterial.dispose();
+      redGlassMaterial.dispose();
+      outerGlassMaterial.dispose();
       eclipseMaterial.dispose();
       backgroundBoardMaterial.dispose();
       pyramidFrontMaterial.dispose();
@@ -1668,6 +1749,9 @@ export default function Home() {
                 aria-label="X"
               ><span>X</span></a>
             </nav>
+            <p className="design-credit">
+              The website design is inspired by Control, the game by Remedy. And yes, it&apos;s one of my favorites.
+            </p>
           </div>
         </section>
       </main>
