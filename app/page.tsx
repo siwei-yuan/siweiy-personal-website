@@ -791,12 +791,34 @@ export default function Home() {
           return sdEquilateralTriangle(normalized) * min(size.x, size.y);
         }
 
+        float crystalBladeDistance(
+          vec2 p,
+          vec2 size,
+          float rotation,
+          float skew,
+          float taper
+        ) {
+          p = rotate2(rotation) * p;
+          float normalizedY = p.y / max(size.y, 0.0001);
+          float widthProfile = mix(
+            taper,
+            1.0,
+            smoothstep(-1.0, 0.72, normalizedY)
+          );
+          float crookedCentre = skew * size.x
+            * (normalizedY * 0.42 + sign(normalizedY) * normalizedY * normalizedY * 0.34);
+          float sideDistance = abs(p.x - crookedCentre) - size.x * widthProfile;
+          float capDistance = (abs(normalizedY) - 1.0) * size.y;
+          return max(sideDistance, capDistance);
+        }
+
         void main() {
           vec2 p = (vUv - 0.5) * 2.0;
           float radius = length(p);
           float angle = atan(p.y, p.x);
           float middleLayer = step(0.5, uLayerMode) * (1.0 - step(1.5, uLayerMode));
           float outerLayer = step(1.5, uLayerMode);
+          float innerLayer = 1.0 - middleLayer - outerLayer;
           float layerTime = uTime * (1.0 + middleLayer * 0.46 - outerLayer * 0.28) + uLayerPhase;
           float drift = sin(uTime * 0.09) * 0.045;
           float segmentCount = mix(12.0, 18.0, middleLayer);
@@ -847,14 +869,23 @@ export default function Home() {
             (0.104 + (1.0 - foldA) * 0.078) * mix(pulseA, 1.42 - pulseA * 0.24, gather)
           );
           sizeA *= vec2(
-            1.0 - middleLayer * 0.28 + outerLayer * 0.62,
-            1.0 - middleLayer * 0.58 + outerLayer * 0.38
+            1.0 - middleLayer * 0.28 + outerLayer * 0.24,
+            1.0 - middleLayer * 0.58 + outerLayer * 1.08
           );
-          float dA = triangleDistance(
+          float rotationA = sin(phase * 0.48) * (0.9 + release * 0.72) + gather * 0.48;
+          float triangleA = triangleDistance(
             shardA,
             sizeA,
-            sin(phase * 0.48) * (0.9 + release * 0.72) + gather * 0.48
+            rotationA
           );
+          float bladeA = crystalBladeDistance(
+            shardA,
+            sizeA * vec2(0.72, 1.18 + outerLayer * 0.34),
+            rotationA * 0.34 + sin(phaseB * 0.37) * 0.12,
+            sin(phase * 0.29) * 0.72,
+            0.16 + foldA * 0.12
+          );
+          float dA = mix(triangleA, bladeA, (1.0 - middleLayer) * 0.9);
 
           float foldB = 0.5 + 0.5 * cos(phaseB * 0.81 + 1.2);
           vec2 shardB = vec2(
@@ -869,14 +900,25 @@ export default function Home() {
             (0.076 + (1.0 - foldB) * 0.071) * mix(pulseB, 1.34, gather)
           );
           sizeB *= vec2(
-            1.0 - middleLayer * 0.34 + outerLayer * 0.72,
-            1.0 - middleLayer * 0.62 + outerLayer * 0.44
+            1.0 - middleLayer * 0.34 + outerLayer * 0.18,
+            1.0 - middleLayer * 0.62 + outerLayer * 1.22
           );
-          float dB = triangleDistance(
+          float rotationB = 1.05
+            + sin(phaseB * 0.55) * (0.72 + release * 0.88)
+            - gather * 0.34;
+          float triangleB = triangleDistance(
             shardB,
             sizeB,
-            1.05 + sin(phaseB * 0.55) * (0.72 + release * 0.88) - gather * 0.34
+            rotationB
           );
+          float bladeB = crystalBladeDistance(
+            shardB,
+            sizeB * vec2(0.68, 1.24 + outerLayer * 0.4),
+            rotationB * 0.28 - 0.2 + cos(phase * 0.31) * 0.13,
+            cos(phaseB * 0.33) * 0.78,
+            0.12 + foldB * 0.16
+          );
+          float dB = mix(triangleB, bladeB, (1.0 - middleLayer) * 0.92);
 
           float foldC = 0.5 + 0.5 * sin(phase * 0.63 + 2.4);
           vec2 shardC = vec2(
@@ -891,14 +933,25 @@ export default function Home() {
             (0.064 + foldC * 0.068) * mix(pulseC, 1.28, gather)
           );
           sizeC *= vec2(
-            1.0 - middleLayer * 0.3 + outerLayer * 0.82,
-            1.0 - middleLayer * 0.6 + outerLayer * 0.5
+            1.0 - middleLayer * 0.3 + outerLayer * 0.3,
+            1.0 - middleLayer * 0.6 + outerLayer * 1.36
           );
-          float dC = triangleDistance(
+          float rotationC = -0.82
+            + cos(phase * 0.49) * (0.95 + release * 0.82)
+            + gather * 0.42;
+          float triangleC = triangleDistance(
             shardC,
             sizeC,
-            -0.82 + cos(phase * 0.49) * (0.95 + release * 0.82) + gather * 0.42
+            rotationC
           );
+          float bladeC = crystalBladeDistance(
+            shardC,
+            sizeC * vec2(0.64, 1.3 + outerLayer * 0.44),
+            rotationC * 0.31 + 0.17 + sin(phaseB * 0.28) * 0.14,
+            sin(phase * 0.36 + 1.4) * 0.82,
+            0.1 + foldC * 0.18
+          );
+          float dC = mix(triangleC, bladeC, (1.0 - middleLayer) * 0.94);
 
           // During the gather phase a larger mirrored petal grows out of the
           // overlapping shards, making the combination/recomposition readable.
@@ -915,10 +968,23 @@ export default function Home() {
             1.0 - middleLayer * 0.25 + outerLayer * 0.78,
             1.0 - middleLayer * 0.6 + outerLayer * 0.46
           );
-          float dComposite = triangleDistance(
+          float compositeRotation = sin(morphClock * 0.53 + mirrorId * 0.11) * 0.62;
+          float triangleComposite = triangleDistance(
             compositeShard,
             compositeSize,
-            sin(morphClock * 0.53 + mirrorId * 0.11) * 0.62
+            compositeRotation
+          );
+          float bladeComposite = crystalBladeDistance(
+            compositeShard,
+            compositeSize * vec2(0.72, 1.14 + outerLayer * 0.32),
+            compositeRotation * 0.38,
+            sin(morphClock * 0.44 + mirrorId) * 0.54,
+            0.2
+          );
+          float dComposite = mix(
+            triangleComposite,
+            bladeComposite,
+            (1.0 - middleLayer) * 0.72
           );
 
           float individualWeight = mix(1.0, 0.34, gather);
@@ -967,6 +1033,21 @@ export default function Home() {
             edgeComposite * flowComposite * incidenceComposite,
             max(edgeA * flowA * incidenceA, max(edgeB * flowB * incidenceB, edgeC * flowC * incidenceC))
           ) * fracture * outerShardZone;
+          float sweepAngle = angle
+            - layerTime * (0.26 + innerLayer * 0.08 + outerLayer * 0.13);
+          float broadSweep = 0.5 + 0.5 * cos(sweepAngle);
+          float rotatingHighlight = pow(broadSweep, 10.0);
+          float counterGlint = pow(
+            0.5 + 0.5 * cos(angle * 3.0 + layerTime * 0.41 + uLayerPhase),
+            16.0
+          );
+          float rotatingShade = 0.2
+            + smoothstep(0.02, 0.86, broadSweep) * 0.68
+            + rotatingHighlight * (0.82 + outerLayer * 0.72)
+            + counterGlint * (0.18 + outerLayer * 0.2);
+          float blueLightField = mix(1.0, rotatingShade, 1.0 - middleLayer);
+          faintEdges *= blueLightField;
+          flowingEdges *= mix(1.0, 0.42 + blueLightField * 0.88, 1.0 - middleLayer);
           float shardBloom = exp(-abs(min(dComposite, min(dA, min(dB, dC)))) / 0.026) * flowingEdges;
 
           float internalA = pow(0.5 + 0.5 * sin(shardA.x * 38.0 - shardA.y * 72.0 + uTime * 0.82 + mirrorId), 9.0) * fillA;
@@ -1025,14 +1106,44 @@ export default function Home() {
             refractedLight * vec3(1.34, 0.12, 0.055),
             middleLayer * 0.86
           );
+          float crystallineDepth = shardFill
+            * (1.0 - middleLayer)
+            * (0.18 + coarse * 0.32 + internalCaustics * 0.24)
+            * (0.38 + blueLightField * 0.74);
+          float internalVein = pow(
+            0.5 + 0.5 * sin(
+              localTangent * 27.0 - animatedRadius * 43.0
+              + layerTime * 0.38 + mirrorId * 0.63
+            ),
+            6.0
+          ) * shardFill * (1.0 - middleLayer);
+          vec3 grayBlueTransmission = mix(
+            vec3(0.018, 0.042, 0.06),
+            vec3(0.13, 0.23, 0.31),
+            coarse
+          );
           vec3 color = darkGlass * shardFill;
+          color += grayBlueTransmission
+            * crystallineDepth
+            * (0.74 + innerLayer * 0.4 + outerLayer * 1.08);
+          color += mix(electricBlue, cyan, 0.46)
+            * internalVein
+            * (0.055 + innerLayer * 0.035 + outerLayer * 0.1)
+            * (0.42 + blueLightField * 0.86);
+          refractedLight *= mix(1.0, 0.34 + blueLightField, 1.0 - middleLayer);
           color += refractedLight * 0.6;
           color += internalSpectrum * internalCaustics * (0.28 + angularLight * 0.3);
           color += spectral * closeGlow * shardFill * (0.07 + angularLight * 0.16);
           color += spectral * faintEdges * (0.84 + gather * 0.24);
           color += mix(spectral, white, flowingEdges * 0.34) * flowingEdges * sourceFacing * 1.3;
+          color += mix(spectral, white, 0.28)
+            * rotatingHighlight
+            * faintEdges
+            * (innerLayer * 0.2 + outerLayer * 0.46);
 
-          float glassOpacity = shardFill * (0.13 + coarse * 0.06);
+          float glassOpacity = shardFill
+            * (0.13 + coarse * 0.06)
+            * (1.0 + innerLayer * 0.28 + outerLayer * 0.78);
           float edgeOpacity = faintEdges * (0.78 + gather * 0.22) + flowingEdges * sourceFacing * 1.16;
           float refractionOpacity = max(refractR, max(refractG, refractB)) * shardFill * 0.46
             + refractGhost * shardFill * 0.16;
@@ -1046,15 +1157,22 @@ export default function Home() {
           float outerBand = smoothstep(0.705, 0.75, radius)
             * (1.0 - smoothstep(0.945, 0.985, radius));
           float outerBoundary = outerLayer
-            * exp(-pow((radius - 0.942) / 0.026, 2.0))
+            * exp(-pow((radius - 0.942) / 0.034, 2.0))
             * max(faintEdges * 0.72, flowingEdges)
             * outerBand;
-          color += mix(spectral, white, 0.3) * outerBoundary * 0.52;
-          edgeOpacity += outerBoundary * 0.68;
+          color += mix(spectral, white, 0.34) * outerBoundary * 0.76;
+          edgeOpacity += outerBoundary * 1.02;
+          // Keep the outer ring sparse without switching complete angular
+          // segments on/off. The previous step/floor mask caused both visible
+          // seams and a periodic jump when the active segment advanced.
+          float sparseDrift = morphClock * 0.075 + uLayerPhase * 0.18;
+          float sparseWaveA = 0.5 + 0.5 * cos(angle * 2.0 - sparseDrift);
+          float sparseWaveB = 0.5 + 0.5 * cos(angle * 3.0 + sparseDrift * 0.63 + 1.7);
+          float sparseField = clamp(sparseWaveA * 0.78 + sparseWaveB * 0.22, 0.0, 1.0);
           float sparseSegment = mix(
-            0.035,
+            0.12,
             1.0,
-            step(1.5, mod(segmentId + floor(morphClock * 0.12), 4.0))
+            smoothstep(0.16, 0.86, sparseField)
           );
           float layerMask = mix(1.0, middleBand, middleLayer);
           layerMask = mix(layerMask, outerBand * sparseSegment, outerLayer);
@@ -1069,6 +1187,7 @@ export default function Home() {
         }
       `,
     });
+    glassMaterial.uniforms.uLayerIntensity.value = 1.2;
     const redGlassMaterial = glassMaterial.clone();
     redGlassMaterial.uniforms.uLayerMode.value = 1;
     redGlassMaterial.uniforms.uLayerPhase.value = 1.85;
@@ -1076,7 +1195,7 @@ export default function Home() {
     const outerGlassMaterial = glassMaterial.clone();
     outerGlassMaterial.uniforms.uLayerMode.value = 2;
     outerGlassMaterial.uniforms.uLayerPhase.value = 4.1;
-    outerGlassMaterial.uniforms.uLayerIntensity.value = 0.74;
+    outerGlassMaterial.uniforms.uLayerIntensity.value = 1.14;
     const eclipseMaterial = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
