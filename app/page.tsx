@@ -368,6 +368,8 @@ export default function Home() {
   const posterSourceRef = useRef<HTMLButtonElement | null>(null);
   const posterCloseTimerRef = useRef<number | null>(null);
   const posterClosingRef = useRef(false);
+  const posterBoundsRef = useRef(new WeakMap<HTMLElement, DOMRect>());
+  const posterMotionFramesRef = useRef(new Map<HTMLElement, number>());
   const pulseRef = useRef(0);
   const [activePoster, setActivePoster] = useState<PosterEntry | null>(null);
   const [isPosterReady, setIsPosterReady] = useState(false);
@@ -385,6 +387,11 @@ export default function Home() {
     return () => {
       decodedImages.forEach((image) => image.removeAttribute("src"));
     };
+  }, []);
+
+  useEffect(() => () => {
+    posterMotionFramesRef.current.forEach((frame) => window.cancelAnimationFrame(frame));
+    posterMotionFramesRef.current.clear();
   }, []);
 
   useEffect(() => {
@@ -548,6 +555,21 @@ export default function Home() {
     }
   }, [activePoster, isPosterReady]);
 
+  const preparePosterHover = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.pointerType === "touch") return;
+    const interactionRoot = event.currentTarget;
+    const poster = interactionRoot.matches(".poster-card, .poster-focus-card")
+      ? interactionRoot
+      : interactionRoot.querySelector<HTMLElement>(".poster-card, .poster-focus-card");
+    if (!poster) return;
+    const anchor = interactionRoot.matches(".poster-anchor")
+      ? interactionRoot
+      : poster.closest<HTMLElement>(".poster-anchor");
+    posterBoundsRef.current.set(interactionRoot, interactionRoot.getBoundingClientRect());
+    poster.dataset.pointerLit = "true";
+    if (anchor) anchor.dataset.posterActive = "true";
+  };
+
   const handlePosterMove = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.pointerType === "touch") return;
     const interactionRoot = event.currentTarget;
@@ -555,28 +577,42 @@ export default function Home() {
       ? interactionRoot
       : interactionRoot.querySelector<HTMLElement>(".poster-card, .poster-focus-card");
     if (!poster) return;
-    const bounds = interactionRoot.getBoundingClientRect();
-    const horizontal = (event.clientX - bounds.left) / bounds.width - 0.5;
-    const vertical = (event.clientY - bounds.top) / bounds.height - 0.5;
     const anchor = interactionRoot.matches(".poster-anchor")
       ? interactionRoot
       : poster.closest<HTMLElement>(".poster-anchor");
-    poster.style.setProperty("--poster-follow-x", `${horizontal * 10}px`);
-    poster.style.setProperty("--poster-follow-y", `${vertical * 7}px`);
-    poster.style.setProperty("--poster-tilt-x", `${vertical * -3.2}deg`);
-    poster.style.setProperty("--poster-tilt-y", `${horizontal * 3.8}deg`);
-    poster.style.setProperty("--poster-light-x", `${(horizontal + 0.5) * 100}%`);
-    poster.style.setProperty("--poster-light-y", `${(vertical + 0.5) * 100}%`);
-    poster.dataset.pointerLit = "true";
-    if (anchor) {
-      anchor.dataset.posterActive = "true";
-      anchor.style.setProperty("--poster-shadow-x", `${7 - horizontal * 25}px`);
-      anchor.style.setProperty("--poster-shadow-y", `${8 - vertical * 20}px`);
-    }
+    if (poster.dataset.pointerLit !== "true") preparePosterHover(event);
+
+    const clientX = event.clientX;
+    const clientY = event.clientY;
+    const pendingFrame = posterMotionFramesRef.current.get(interactionRoot);
+    if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
+
+    const frame = window.requestAnimationFrame(() => {
+      posterMotionFramesRef.current.delete(interactionRoot);
+      const bounds = posterBoundsRef.current.get(interactionRoot)
+        ?? interactionRoot.getBoundingClientRect();
+      const horizontal = Math.min(Math.max((clientX - bounds.left) / bounds.width - 0.5, -0.5), 0.5);
+      const vertical = Math.min(Math.max((clientY - bounds.top) / bounds.height - 0.5, -0.5), 0.5);
+      poster.style.setProperty("--poster-follow-x", `${horizontal * 10}px`);
+      poster.style.setProperty("--poster-follow-y", `${vertical * 7}px`);
+      poster.style.setProperty("--poster-tilt-x", `${vertical * -3.2}deg`);
+      poster.style.setProperty("--poster-tilt-y", `${horizontal * 3.8}deg`);
+      poster.style.setProperty("--poster-light-x", `${(horizontal + 0.5) * 100}%`);
+      poster.style.setProperty("--poster-light-y", `${(vertical + 0.5) * 100}%`);
+      if (anchor) {
+        anchor.style.setProperty("--poster-shadow-x", `${7 - horizontal * 25}px`);
+        anchor.style.setProperty("--poster-shadow-y", `${8 - vertical * 20}px`);
+      }
+    });
+    posterMotionFramesRef.current.set(interactionRoot, frame);
   };
 
   const resetPosterPose = (event: ReactPointerEvent<HTMLElement>) => {
     const interactionRoot = event.currentTarget;
+    const pendingFrame = posterMotionFramesRef.current.get(interactionRoot);
+    if (pendingFrame) window.cancelAnimationFrame(pendingFrame);
+    posterMotionFramesRef.current.delete(interactionRoot);
+    posterBoundsRef.current.delete(interactionRoot);
     const poster = interactionRoot.matches(".poster-card, .poster-focus-card")
       ? interactionRoot
       : interactionRoot.querySelector<HTMLElement>(".poster-card, .poster-focus-card");
@@ -1841,6 +1877,7 @@ export default function Home() {
                     <div
                       className="poster-anchor"
                       key={entry.title}
+                      onPointerEnter={preparePosterHover}
                       onPointerMove={handlePosterMove}
                       onPointerLeave={resetPosterPose}
                     >
@@ -1920,6 +1957,7 @@ export default function Home() {
           <div className="poster-inspection">
             <div
               className="poster-focus-shell"
+              onPointerEnter={preparePosterHover}
               onPointerMove={handlePosterMove}
               onPointerLeave={resetPosterPose}
               onClick={(event) => event.stopPropagation()}

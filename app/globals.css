@@ -534,6 +534,7 @@ body::selection { background: var(--red); color: #fff; }
   --poster-lift: -8px;
   --poster-shadow-x: 7px;
   --poster-shadow-y: 8px;
+  --poster-shadow-scale: 1;
   position: relative;
   z-index: 1;
   aspect-ratio: 4 / 5;
@@ -553,14 +554,15 @@ body::selection { background: var(--red); color: #fff; }
   z-index: 0;
   background: rgba(56, 69, 71, .92);
   opacity: .9;
-  transform: translate(var(--poster-shadow-x), var(--poster-shadow-y)) scale(1);
+  transform: translate(var(--poster-shadow-x), var(--poster-shadow-y));
+  scale: var(--poster-shadow-scale);
   transform-origin: 50% 50%;
   box-shadow:
     4px 5px 0 rgba(10, 14, 15, .92),
     0 28px 70px rgba(0,0,0,.48),
     0 0 38px rgba(155, 187, 191, .065);
   transition:
-    transform 190ms cubic-bezier(.18,.72,.2,1),
+    scale 190ms cubic-bezier(.18,.72,.2,1),
     filter 220ms ease,
     opacity 220ms ease,
     box-shadow 220ms ease;
@@ -608,16 +610,18 @@ body::selection { background: var(--red); color: #fff; }
     perspective(1000px)
     translate3d(
       var(--poster-follow-x),
-      calc(var(--poster-hover-y) + var(--poster-follow-y)),
-      var(--poster-depth)
+      var(--poster-follow-y),
+      0
     )
     rotateX(var(--poster-tilt-x))
-    rotateY(var(--poster-tilt-y))
-    scale(var(--poster-scale));
+    rotateY(var(--poster-tilt-y));
+  translate: 0 var(--poster-hover-y) var(--poster-depth);
+  scale: var(--poster-scale);
   transform-origin: 50% 52%;
-  will-change: transform;
+  will-change: transform, translate, scale;
   transition:
-    transform 180ms cubic-bezier(.18,.72,.2,1),
+    translate 180ms cubic-bezier(.18,.72,.2,1),
+    scale 180ms cubic-bezier(.18,.72,.2,1),
     box-shadow 220ms ease,
     filter 220ms ease;
 }
@@ -666,8 +670,8 @@ body::selection { background: var(--red); color: #fff; }
 
 .records-list .poster-anchor[data-poster-active="true"]::before,
 .records-list .poster-anchor:has(.poster-card:focus-visible)::before {
+  --poster-shadow-scale: 1.065;
   opacity: .7;
-  transform: translate(var(--poster-shadow-x), var(--poster-shadow-y)) scale(1.065);
   filter: blur(2.2px) brightness(.72);
   box-shadow:
     3px 4px 0 rgba(10, 14, 15, .7),
