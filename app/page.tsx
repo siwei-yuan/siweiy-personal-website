@@ -819,10 +819,19 @@ export default function Home() {
           float middleLayer = step(0.5, uLayerMode) * (1.0 - step(1.5, uLayerMode));
           float outerLayer = step(1.5, uLayerMode);
           float innerLayer = 1.0 - middleLayer - outerLayer;
+          // The layer meshes use different world-space radii. Compensate for
+          // that here so the visible shard sizes follow one predictable scale:
+          // 0.46x overall, then a fixed 1.2x increase from layer to layer.
+          float layerGeometryCompensation = innerLayer
+            + middleLayer * (9.6 / 12.8)
+            + outerLayer * (9.6 / 17.0);
+          float layerSizeRatio = innerLayer + middleLayer * 1.2 + outerLayer * 1.44;
+          float layerShardScale = 0.46 * layerGeometryCompensation * layerSizeRatio;
+          float outerLane = clamp(middleLayer + outerLayer, 0.0, 1.0);
           float layerTime = uTime * (1.0 + middleLayer * 0.46 - outerLayer * 0.28) + uLayerPhase;
           float drift = sin(uTime * 0.09) * 0.045;
-          float segmentCount = mix(12.0, 18.0, middleLayer);
-          segmentCount = mix(segmentCount, 8.0, outerLayer);
+          float segmentCount = mix(16.0, 22.0, middleLayer);
+          segmentCount = mix(segmentCount, 12.0, outerLayer);
           float span = TAU / segmentCount;
           float wrappedAngle = mod(angle + PI + drift, TAU);
           float segmentId = floor(wrappedAngle / span);
@@ -856,9 +865,14 @@ export default function Home() {
           float farGlow = exp(-pow(ringDistance / 0.096, 2.0));
 
           float foldA = 0.5 + 0.5 * sin(phase * 0.72);
+          float shardATarget = mix(
+            0.718 + sin(phase) * 0.054,
+            0.78 + sin(phase) * 0.036,
+            outerLane
+          );
           vec2 shardA = vec2(
             localTangent + (-0.105 + sin(phaseB) * 0.038) * separation,
-            animatedRadius - mix(0.718 + sin(phase) * 0.054, sharedRadius, gather * 0.9)
+            animatedRadius - mix(shardATarget, sharedRadius, gather * 0.9)
           );
           shardA.x += shardA.y * sin(phase * 0.61) * (1.15 + release * 0.9);
           shardA.x = mix(shardA.x, abs(shardA.x) - 0.026, foldA * (0.72 + release * 0.2));
@@ -868,29 +882,37 @@ export default function Home() {
             (0.072 + foldA * 0.052) * pulseA,
             (0.104 + (1.0 - foldA) * 0.078) * mix(pulseA, 1.42 - pulseA * 0.24, gather)
           );
-          sizeA *= vec2(
-            1.0 - middleLayer * 0.28 + outerLayer * 0.24,
-            1.0 - middleLayer * 0.58 + outerLayer * 1.08
-          );
+          sizeA *= layerShardScale;
           float rotationA = sin(phase * 0.48) * (0.9 + release * 0.72) + gather * 0.48;
           float triangleA = triangleDistance(
             shardA,
             sizeA,
             rotationA
           );
+          float bladeRotationA = mix(
+            rotationA * 0.34 + sin(phaseB * 0.37) * 0.12,
+            sin(phaseB * 0.37) * 0.18
+              + sin(layerTime * 0.21 + mirrorId * 0.67) * 0.09,
+            outerLayer
+          );
           float bladeA = crystalBladeDistance(
             shardA,
-            sizeA * vec2(0.72, 1.18 + outerLayer * 0.34),
-            rotationA * 0.34 + sin(phaseB * 0.37) * 0.12,
+            sizeA * vec2(0.72, 1.18),
+            bladeRotationA,
             sin(phase * 0.29) * 0.72,
             0.16 + foldA * 0.12
           );
           float dA = mix(triangleA, bladeA, (1.0 - middleLayer) * 0.9);
 
           float foldB = 0.5 + 0.5 * cos(phaseB * 0.81 + 1.2);
+          float shardBTarget = mix(
+            0.858 + cos(phaseB * 0.64) * 0.058,
+            0.845 + cos(phaseB * 0.64) * 0.04,
+            outerLane
+          );
           vec2 shardB = vec2(
             localTangent + sin(phase * 0.77) * 0.045 * separation,
-            animatedRadius - mix(0.858 + cos(phaseB * 0.64) * 0.058, sharedRadius, gather * 0.96)
+            animatedRadius - mix(shardBTarget, sharedRadius, gather * 0.96)
           );
           shardB.x -= shardB.y * cos(phaseB * 0.54) * (0.82 + release * 0.96);
           shardB.y = mix(shardB.y, abs(shardB.y) - 0.018, foldB * (0.62 + release * 0.26));
@@ -899,10 +921,7 @@ export default function Home() {
             (0.055 + foldB * 0.043) * pulseB,
             (0.076 + (1.0 - foldB) * 0.071) * mix(pulseB, 1.34, gather)
           );
-          sizeB *= vec2(
-            1.0 - middleLayer * 0.34 + outerLayer * 0.18,
-            1.0 - middleLayer * 0.62 + outerLayer * 1.22
-          );
+          sizeB *= layerShardScale;
           float rotationB = 1.05
             + sin(phaseB * 0.55) * (0.72 + release * 0.88)
             - gather * 0.34;
@@ -911,19 +930,30 @@ export default function Home() {
             sizeB,
             rotationB
           );
+          float bladeRotationB = mix(
+            rotationB * 0.28 - 0.2 + cos(phase * 0.31) * 0.13,
+            cos(phase * 0.31) * 0.2
+              + sin(layerTime * 0.17 - mirrorId * 0.54) * 0.08,
+            outerLayer
+          );
           float bladeB = crystalBladeDistance(
             shardB,
-            sizeB * vec2(0.68, 1.24 + outerLayer * 0.4),
-            rotationB * 0.28 - 0.2 + cos(phase * 0.31) * 0.13,
+            sizeB * vec2(0.68, 1.24),
+            bladeRotationB,
             cos(phaseB * 0.33) * 0.78,
             0.12 + foldB * 0.16
           );
           float dB = mix(triangleB, bladeB, (1.0 - middleLayer) * 0.92);
 
           float foldC = 0.5 + 0.5 * sin(phase * 0.63 + 2.4);
+          float shardCTarget = mix(
+            0.982 + sin(phase * 0.52 + 1.0) * 0.047,
+            0.91 + sin(phase * 0.52 + 1.0) * 0.034,
+            outerLane
+          );
           vec2 shardC = vec2(
             localTangent + (0.112 + cos(phaseB * 0.69) * 0.041) * separation,
-            animatedRadius - mix(0.982 + sin(phase * 0.52 + 1.0) * 0.047, sharedRadius, gather * 0.88)
+            animatedRadius - mix(shardCTarget, sharedRadius, gather * 0.88)
           );
           shardC.x = mix(shardC.x, -abs(shardC.x) + 0.018, foldC * (0.48 + release * 0.34));
           shardC.x += shardC.y * sin(phaseB * 0.77) * (0.95 + release * 1.08);
@@ -932,10 +962,7 @@ export default function Home() {
             (0.043 + (1.0 - foldC) * 0.044) * pulseC,
             (0.064 + foldC * 0.068) * mix(pulseC, 1.28, gather)
           );
-          sizeC *= vec2(
-            1.0 - middleLayer * 0.3 + outerLayer * 0.3,
-            1.0 - middleLayer * 0.6 + outerLayer * 1.36
-          );
+          sizeC *= layerShardScale;
           float rotationC = -0.82
             + cos(phase * 0.49) * (0.95 + release * 0.82)
             + gather * 0.42;
@@ -944,10 +971,16 @@ export default function Home() {
             sizeC,
             rotationC
           );
+          float bladeRotationC = mix(
+            rotationC * 0.31 + 0.17 + sin(phaseB * 0.28) * 0.14,
+            sin(phaseB * 0.28) * 0.22
+              + cos(layerTime * 0.19 + mirrorId * 0.49) * 0.1,
+            outerLayer
+          );
           float bladeC = crystalBladeDistance(
             shardC,
-            sizeC * vec2(0.64, 1.3 + outerLayer * 0.44),
-            rotationC * 0.31 + 0.17 + sin(phaseB * 0.28) * 0.14,
+            sizeC * vec2(0.64, 1.3),
+            bladeRotationC,
             sin(phase * 0.36 + 1.4) * 0.82,
             0.1 + foldC * 0.18
           );
@@ -964,20 +997,22 @@ export default function Home() {
             mix(0.055, 0.224, gather),
             mix(0.072, 0.318, gather) * (0.84 + 0.2 * sin(morphClock * 0.91))
           );
-          compositeSize *= vec2(
-            1.0 - middleLayer * 0.25 + outerLayer * 0.78,
-            1.0 - middleLayer * 0.6 + outerLayer * 0.46
-          );
+          compositeSize *= layerShardScale;
           float compositeRotation = sin(morphClock * 0.53 + mirrorId * 0.11) * 0.62;
           float triangleComposite = triangleDistance(
             compositeShard,
             compositeSize,
             compositeRotation
           );
+          float bladeCompositeRotation = mix(
+            compositeRotation * 0.38,
+            sin(layerTime * 0.16 + mirrorId * 0.58) * 0.12,
+            outerLayer
+          );
           float bladeComposite = crystalBladeDistance(
             compositeShard,
-            compositeSize * vec2(0.72, 1.14 + outerLayer * 0.32),
-            compositeRotation * 0.38,
+            compositeSize * vec2(0.72, 1.14),
+            bladeCompositeRotation,
             sin(morphClock * 0.44 + mirrorId) * 0.54,
             0.2
           );
@@ -1152,10 +1187,12 @@ export default function Home() {
             + closeGlow * flowingEdges * 0.09
             + farGlow * flowingEdges * 0.03;
           float outerFeather = 1.0 - smoothstep(0.985, 1.0, radius);
-          float middleBand = smoothstep(0.735, 0.775, radius)
-            * (1.0 - smoothstep(0.86, 0.905, radius));
-          float outerBand = smoothstep(0.705, 0.75, radius)
-            * (1.0 - smoothstep(0.945, 0.985, radius));
+          float innerBand = smoothstep(0.47, 0.53, radius)
+            * (1.0 - smoothstep(0.92, 0.975, radius));
+          float middleBand = smoothstep(0.69, 0.735, radius)
+            * (1.0 - smoothstep(0.91, 0.965, radius));
+          float outerBand = smoothstep(0.69, 0.735, radius)
+            * (1.0 - smoothstep(0.93, 0.98, radius));
           float outerBoundary = outerLayer
             * exp(-pow((radius - 0.942) / 0.034, 2.0))
             * max(faintEdges * 0.72, flowingEdges)
@@ -1174,7 +1211,7 @@ export default function Home() {
             1.0,
             smoothstep(0.16, 0.86, sparseField)
           );
-          float layerMask = mix(1.0, middleBand, middleLayer);
+          float layerMask = mix(innerBand, middleBand, middleLayer);
           layerMask = mix(layerMask, outerBand * sparseSegment, outerLayer);
           float alpha = (glassOpacity + edgeOpacity + refractionOpacity + internalOpacity + bloom)
             * pulse
@@ -1492,11 +1529,11 @@ export default function Home() {
     glassHalo.position.set(0, 0.45, -8.44);
     glassHalo.renderOrder = 5;
     monument.add(glassHalo);
-    const redGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(12.35, 224), redGlassMaterial);
+    const redGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(12.8, 224), redGlassMaterial);
     redGlassHalo.position.set(0, 0.45, -8.46);
     redGlassHalo.renderOrder = 4;
     monument.add(redGlassHalo);
-    const outerGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(15.0, 224), outerGlassMaterial);
+    const outerGlassHalo = new THREE.Mesh(new THREE.CircleGeometry(17.0, 224), outerGlassMaterial);
     outerGlassHalo.position.set(0, 0.45, -8.48);
     outerGlassHalo.renderOrder = 3;
     monument.add(outerGlassHalo);
